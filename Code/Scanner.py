@@ -63,6 +63,11 @@ class Token:
         else:
             return "({}, {}) ".format(self.type, self.value)
 
+    def translate_for_parser(self):
+        if self.type in [self.NUMBER, self.ID, self.EOF]:
+            return self.type
+        return self.value
+
 
 class State:
     def __init__(self, final=False, finished=False, stype=None):
@@ -71,7 +76,7 @@ class State:
         self.type = stype
 
 
-class DFA:
+class ScannerDFA:
     def __init__(self):
         self.current_state = self.start_state = State()
 
@@ -174,7 +179,7 @@ class DFA:
 
 class Scanner:
     def __init__(self):
-        self.dfa = DFA()
+        self.dfa = ScannerDFA()
 
     @staticmethod
     def read_file(file_name):
@@ -226,6 +231,12 @@ class Scanner:
                     buffer = ""
             if c == "\n":
                 line_number += 1
+
+    def scan_file_ignore_extra(self, file_name):
+        for token, line_number in scanner.scan_file(file_name):
+            if token.type == Token.WHITE_SPACE or token.type == Token.COMMENT:
+                continue
+            yield token, line_number
 
 
 if __name__ == "__main__":
