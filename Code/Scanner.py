@@ -243,28 +243,28 @@ if __name__ == "__main__":
     scanner = Scanner()
 
     scanner_last_number = -1
-    error_last_number = -1
+    lexical_error_last_number = -1
 
     scanner_output = open("scanner.txt", "w")
     lexical_errors = open("lexical_errors.txt", "w")
 
-    for token, line_number in scanner.scan_file("test.nc"):
+    for token, last_line_number in scanner.scan_file("test.nc"):
         if token.type == Token.WHITE_SPACE or token.type == Token.COMMENT:
             continue
 
         if token.type == Token.ERROR:
-            if line_number != error_last_number:
-                if error_last_number != -1:
+            if last_line_number != lexical_error_last_number:
+                if lexical_error_last_number != -1:
                     lexical_errors.write("\n")
-                error_last_number = line_number
-                lexical_errors.write(str(line_number) + ". ")
+                lexical_error_last_number = last_line_number
+                lexical_errors.write(str(last_line_number) + ". ")
             lexical_errors.write(token.to_str())
         else:
-            if line_number != scanner_last_number:
+            if last_line_number != scanner_last_number:
                 if scanner_last_number != -1:
                     scanner_output.write("\n")
-                scanner_last_number = line_number
-                scanner_output.write(str(line_number) + ". ")
+                scanner_last_number = last_line_number
+                scanner_output.write(str(last_line_number) + ". ")
             scanner_output.write(token.to_str())
 
     scanner_output.close()
