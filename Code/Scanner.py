@@ -196,6 +196,7 @@ class Scanner:
             for c in code:
                 yield c
             yield None
+            yield None
 
         for c in get_code_char_by_char():
             current_state = self.dfa.current_state
@@ -233,9 +234,10 @@ class Scanner:
                 line_number += 1
 
     def scan_file_ignore_extra(self, file_name):
-        for token, line_number in scanner.scan_file(file_name):
-            if token.type == Token.WHITE_SPACE or token.type == Token.COMMENT:
+        for token, line_number in self.scan_file(file_name):
+            if token.type == Token.WHITE_SPACE or token.type == Token.COMMENT or token.type == Token.ERROR:
                 continue
+            print("new Token: ", token.translate_for_parser())
             yield token, line_number
 
 

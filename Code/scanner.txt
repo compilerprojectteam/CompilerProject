@@ -14,3 +14,4 @@
 15. (SYMBOL, }) (SYMBOL, }) 
 16. (KEYWORD, return) (SYMBOL, ;) 
 17. (SYMBOL, }) 
+18. (EOF, None) 

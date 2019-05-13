@@ -1,5 +1,5 @@
 from Code.Scanner import *
-
+from anytree import Node,RenderTree
 
 class TransitionDFA:
     def __init__(self, transitions):
@@ -18,16 +18,138 @@ class Parser:
 
     def __init__(self, file_name):
         self.scanner = Scanner()
+        self.first = {}
+        self.follow = {}
         self.init_dfas()
-        self.first = {"Program": [], "Declaration-List": []}
-        self.follow = {"Program": [], "Declaration-List": []}
         self.current_token = None
         self.scanner_tokens = self.scanner.scan_file_ignore_extra(file_name)
 
     def init_dfas(self):
+        self.first = {
+            "Program": ["EOF", "int", "void"],
+            "Declaration-list": ["", "int", "void"],
+            "Declaration": ["int", "void"],
+            "Declaration-initial": ["int", "void"],
+            "Declaration-prime": ["(", ";", "["],
+            "Var-declaration-prime": [";", "["],
+            "Fun-declaration-prime": ["("],
+            "Type-specifier": ["int", "void"],
+            "Params": ["int", "void"],
+            "Param-list-void-abtar": ["ID", ""],
+            "Param-list": [",", ""],
+            "Param": ["int", "void"],
+            "Param-prime": ["", "["],
+            "Compound-stmt": ["{"],
+            "Statement-list": ["", "{", "continue", "break", ";", "if", "while", "return",
+                               "switch", "ID", "+", "-", "(", "NUM"],
+            "Statement": ["{", "continue", "break", ";", "if", "while", "return", "switch", "ID", "+", "-", "(", "NUM"],
+            "Expression-stmt": ["continue", "break", ";", "ID", "+", "-", "(", "NUM"],
+            "Selection-stmt": ["if"],
+            "Iteration-stmt": ["while"],
+            "Return-stmt": ["return"],
+            "Return-stmt-prime": [";", "ID", "+", "-", "(", "NUM"],
+            "Switch-stmt": ["switch"],
+            "Case-stmts": ["", "Case"],
+            "Case-stmt": ["Case"],
+            "Default-stmt": ["default", ""],
+            "Expression": ["ID", "+", "-", "(", "NUM"],
+            "B": ["=", "(", "[", "*", "+", "-", "==", "<", ""],
+            "Simple-expression-zegond": ["+", "-", "(", "NUM"],
+            "Simple-expression-prime": ["(", "[", "*", "+", "-", "==", "<", ""],
+            "C": ["", "==", "<"],
+            "Relop": ["==", "<"],
+            "Addop": ["+", "-"],
+            "Additive-expression": ["+", "-", "(", "NUM", "ID"],
+            "Additive-expression-prime": ["(", "[", "*", "+", "-", ""],
+            "Additive-expression-zegond": ["+", "-", "(", "NUM"],
+            "D": ["+", "-", ""],
+            "Term": ["+", "-", "(", "NUM", "ID"],
+            "Term-prime": ["(", "[", "*", ""],
+            "Term-zegond": ["+", "-", "(", "NUM"],
+            "G": ["*", ""],
+            "Signed-factor": ["+", "-", "(", "NUM", "ID"],
+            "Signed-factor-prime": ["(", "[", ""],
+            "Signed-factor-zegond": ["+", "-", "(", "NUM"],
+            "Factor": ["(", "NUM", "ID"],
+            "Var-call-prime": ["(", "[", ""],
+            "Var-prime": ["[", ""],
+            "Factor-prime": ["(", "[", ""],
+            "Factor-zegond": ["(", "NUM"],
+            "Args": ["", "ID", "+", "-", "(", "NUM"],
+            "Arg-list": ["ID", "+", "-", "(", "NUM"],
+            "Arg-list-prime": [",", ""],
+        }
+
+        self.follow = {
+            "Program": ["$"],
+            "Declaration-list": ["EOF", "{", "continue", "break", ";", "if", "while", "return", "switch", "ID", "+",
+                                 "-", "(", "NUM", "}"],
+            "Declaration": ["int", "void", "EOF", "{", "continue", "break", ";", "if", "while", "return", "switch",
+                            "ID", "+", "-", "(", "NUM", "}"],
+            "Declaration-initial": ["(", ";", "[", ",", ")"],
+            "Declaration-prime": ["int", "void", "EOF", "{", "continue", "break", ";", "if", "while", "return",
+                                  "switch", "ID", "+", "-", "(", "NUM", "}"],
+            "Var-declaration-prime": ["int", "void", "EOF", "{", "continue", "break", ";", "if", "while", "return",
+                                      "switch", "ID", "+", "-", "(", "NUM", "}"],
+            "Fun-declaration-prime": ["int", "void", "EOF", "{", "continue", "break", ";", "if", "while", "return",
+                                      "switch", "ID", "+", "-", "(", "NUM", "}"],
+            "Type-specifier": ["ID"],
+            "Params": [")"],
+            "Param-list-void-abtar": [")"],
+            "Param-list": [")"],
+            "Param": [",", ")"],
+            "Param-prime": [",", ")"],
+            "Compound-stmt": ["int", "void", "EOF", "{", "continue", "break", ";", "if", "while", "return", "switch",
+                              "ID", "+", "-", "(", "NUM", "}", "else", "Case", "default"],
+            "Statement-list": ["}", "Case", "default"],
+            "Statement": ["{", "continue", "break", ";", "if", "while", "return", "switch", "ID", "+", "-", "(", "NUM",
+                          "}", "else", "Case", "default"],
+            "Expression-stmt": ["{", "continue", "break", ";", "if", "while", "return", "switch", "ID", "+", "-", "(",
+                                "NUM", "}", "else", "Case", "default"],
+            "Selection-stmt": ["{", "continue", "break", ";", "if", "while", "return", "switch", "ID", "+", "-", "(",
+                               "NUM", "}", "else", "Case", "default"],
+            "Iteration-stmt": ["{", "continue", "break", ";", "if", "while", "return", "switch", "ID", "+", "-", "(",
+                               "NUM", "}", "else", "Case", "default"],
+            "Return-stmt": ["{", "continue", "break", ";", "if", "while", "return", "switch", "ID", "+", "-", "(",
+                            "NUM", "}", "else", "Case", "default"],
+            "Return-stmt-prime": ["{", "continue", "break", ";", "if", "while", "return", "switch", "ID", "+", "-", "(",
+                                  "NUM", "}", "else", "Case", "default"],
+            "Switch-stmt": ["{", "continue", "break", ";", "if", "while", "return", "switch", "ID", "+", "-", "(",
+                            "NUM", "}", "else", "Case", "default"],
+            "Case-stmts": ["default", "}"],
+            "Case-stmt": ["Case", "default", "}"],
+            "Default-stmt": ["}"],
+            "Expression": [";", ")", "]", ","],
+            "B": [";", ")", "]", ","],
+            "Simple-expression-zegond": [";", ")", "]", ","],
+            "Simple-expression-prime": [";", ")", "]", ","],
+            "C": [";", ")", "]", ","],
+            "Relop": ["+", "-", "(", "NUM", "ID"],
+            "Addop": ["+", "-", "(", "NUM", "ID"],
+            "Additive-expression": [";", ")", "]", ","],
+            "Additive-expression-prime": ["==", "<", ";", ")", "]", ","],
+            "Additive-expression-zegond": ["==", "<", ";", ")", "]", ","],
+            "D": [";", ")", "==", "<", "]", ","],
+            "Term": ["+", "-", ";", ")", "==", "<", "]", ","],
+            "Term-prime": ["+", "-", "==", "<", ";", ")", "]", ","],
+            "Term-zegond": ["+", "-", "==", "<", ";", ")", "]", ","],
+            "G": ["+", "-", ";", ")", "==", "<", "]", ","],
+            "Signed-factor": ["*", "+", "-", ";", ")", "==", "<", "]", ","],
+            "Signed-factor-prime": ["*", "+", "-", "==", "<", ";", ")", "]", ","],
+            "Signed-factor-zegond": ["*", "+", "-", "==", "<", ";", ")", "]", ","],
+            "Factor": ["*", "+", "-", ";", ")", "==", "<", "]", ","],
+            "Var-call-prime": ["*", "+", "-", ";", ")", "==", "<", "]", ","],
+            "Var-prime": ["*", "+", "-", ";", ")", "==", "<", "]", ","],
+            "Factor-prime": ["*", "+", "-", "==", "<", ";", ")", "]", ","],
+            "Factor-zegond": ["*", "+", "-", "==", "<", ";", ")", "]", ","],
+            "Args": [")"],
+            "Arg-list": [")"],
+            "Arg-list-prime": [")"],
+        }
+
         self.dfas = {
             "Program": TransitionDFA({
-                1: {("Declaration-List", False): 2},
+                1: {("Declaration-list", False): 2},
                 2: {("EOF", True): -1}
             }),
 
@@ -343,6 +465,9 @@ class Parser:
         return "" in self.first[V]
 
     def parse_from_non_terminal(self, V):
+        print("parsing from non terminal : ", V)
+        me = Node(V, parent=None)
+
         current_dfa = self.dfas[V]
         current_state = 1
         transitions = current_dfa.transitions
@@ -350,40 +475,64 @@ class Parser:
         while current_state > 0:
             for var, is_terminal in transitions[current_state].keys():
                 c = self.current_token.translate_for_parser()
+                value = self.current_token.to_str()
                 if is_terminal:
                     if c == var:
-                        self.current_token, self.current_line_number = next(self.scanner_tokens)
-                        current_state = transitions[(var, True)]
-                        break
+                        if c == Token.EOF:
+                            current_state = transitions[current_state][(var, True)]
+                            Node(c, parent=me)
+                            break
+                        else:
+                            self.current_token, self.current_line_number = next(self.scanner_tokens)
+                            current_state = transitions[current_state][(var, True)]
+                            Node(value, parent=me)
+                            break
                     else:
                         if current_state != 1:
-                            error("#{} : Syntax Error! Missing {}".format(self.current_line_number, var))
-                            current_state = transitions[(var, True)]
-                            break
+                            if var == Token.EOF:
+                                error("#{} : Syntax Error! Malformed Input".format(self.current_line_number))
+                                return False, me
+                            else:
+                                error("#{} : Syntax Error! Missing {}".format(self.current_line_number, var))
+                                current_state = transitions[current_state][(var, True)]
+                                break
                 else:
 
                     if c in self.first[var]:
-                        self.parse_from_non_terminal(var)
-                        current_state = transitions[(var, False)]
+                        result, node = self.parse_from_non_terminal(var)
+                        node.parent = me
+                        if not result:
+                            return False, me
+                        current_state = transitions[current_state][(var, False)]
                         break
                     else:
                         if self.is_nullable(var):
                             if c in self.follow[var]:
-                                current_state = transitions[(var, False)]
+                                node = Node(var, me)
+                                Node("ε", node)
+                                current_state = transitions[current_state][(var, False)]
                                 break
 
                     if current_state != 1:
                         if c in self.follow[var] and not self.is_nullable(var):
-                            current_state = transitions[(var, False)]
+                            current_state = transitions[current_state][(var, False)]
                             error("#{} : Syntax Error! Missing {}".format(self.current_line_number, var))
                         if c not in self.follow[var] and c not in self.first[var]:
-                            error("#{} : Syntax Error! Unexpected {}".format(self.current_line_number, c))
-                            self.current_token, self.current_line_number = next(self.scanner_tokens)
+                            if c == Token.EOF:
+                                error("#{} : Syntax Error! Unexpected EndOfFile".format(self.current_line_number))
+                                return False, me
+                            else:
+                                error("#{} : Syntax Error! Unexpected {} {}".format(self.current_line_number, c, V))
+                                self.current_token, self.current_line_number = next(self.scanner_tokens)
+        return True, me
 
     def parse(self):
         self.current_token, self.current_line_number = next(self.scanner_tokens)
-        self.parse_from_non_terminal("Program")
+        status, tree_root = self.parse_from_non_terminal("Program")
+        for pre, fill, node in RenderTree(tree_root):
+            print("%s%s" % (pre, node.name))
 
 
 if __name__ == "__main__":
-    pass
+    p = Parser("test.nc")
+    p.parse()
