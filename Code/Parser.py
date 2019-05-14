@@ -1,5 +1,9 @@
 from Code.Scanner import *
-from anytree import Node,RenderTree
+from anytree import Node, RenderTree
+
+parser_errors = None
+scanner_output = None
+
 
 class TransitionDFA:
     def __init__(self, transitions):
@@ -7,7 +11,7 @@ class TransitionDFA:
 
 
 def error(message):
-    print(message)
+    parser_errors.write(message + "\n")
 
 
 class Parser:
@@ -530,9 +534,14 @@ class Parser:
         self.current_token, self.current_line_number = next(self.scanner_tokens)
         status, tree_root = self.parse_from_non_terminal("Program")
         for pre, fill, node in RenderTree(tree_root):
-            print("%s%s" % (pre, node.name))
+            parser_output.write("%s%s" % (pre, node.name))
+            parser_output.write("\n")
 
 
 if __name__ == "__main__":
-    p = Parser("test.nc")
+    parser_errors = open("parser-error.txt", "w", encoding="utf-8")
+    parser_output = open("parser-output.txt", "w", encoding="utf-8")
+    p = Parser("simple.nc")
     p.parse()
+    # scanner_output.close()
+    # parser_output.close()

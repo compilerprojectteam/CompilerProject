@@ -1,0 +1,21 @@
+Program
+├── Declaration-list
+│   ├── Declaration
+│   │   └── Declaration-initial
+│   │       └── Type-specifier
+│   │           └── (KEYWORD, int) 
+│   └── Declaration-list
+│       ├── Declaration
+│       │   ├── Declaration-initial
+│       │   │   ├── Type-specifier
+│       │   │   │   └── (KEYWORD, void) 
+│       │   │   └── (ID, a) 
+│       │   └── Declaration-prime
+│       │       └── Var-declaration-prime
+│       │           ├── (SYMBOL, [) 
+│       │           ├── (NUM, 4) 
+│       │           ├── (SYMBOL, ]) 
+│       │           └── (SYMBOL, ;) 
+│       └── Declaration-list
+│           └── ε
+└── EOF

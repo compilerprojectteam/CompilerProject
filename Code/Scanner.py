@@ -250,7 +250,7 @@ if __name__ == "__main__":
     scanner_output = open("scanner.txt", "w")
     lexical_errors = open("lexical_errors.txt", "w")
 
-    for token, last_line_number in scanner.scan_file("test.nc"):
+    for token, last_line_number in scanner.scan_file("simple.nc"):
         if token.type == Token.WHITE_SPACE or token.type == Token.COMMENT:
             continue
 
