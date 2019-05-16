@@ -158,7 +158,8 @@ class Parser:
             }),
 
             "Declaration-list": TransitionDFA({
-                1: {("Declaration", False): 2},
+                1: {("Declaration", False): 2,
+                    ("Epsilon", True): -1},
                 2: {("Declaration-list", False): -1}
             }),
 
@@ -206,12 +207,14 @@ class Parser:
             }),
 
             "Param-list-void-abtar": TransitionDFA({
-                1: {("ID", True): 2},
+                1: {("ID", True): 2,
+                    ("Epsilon", True): -1},
                 2: {("Param-list", False): -1},
             }),
 
             "Param-list": TransitionDFA({
-                1: {(",", True): 2},
+                1: {(",", True): 2,
+                    ("Epsilon", True): -1},
                 2: {("Param", False): 3},
                 3: {("Param-list", False): -1},
             }),
@@ -222,7 +225,8 @@ class Parser:
             }),
 
             "Param-prime": TransitionDFA({
-                1: {("[", True): 2},
+                1: {("[", True): 2,
+                    ("Epsilon", True): -1},
                 2: {("]", True): -1}
             }),
 
@@ -234,7 +238,8 @@ class Parser:
             }),
 
             "Statement-list": TransitionDFA({
-                1: {("Statement", False): 2},
+                1: {("Statement", False): 2,
+                    ("Epsilon", True): -1},
                 2: {("Statement-list", False): -1}
             }),
 
@@ -299,7 +304,8 @@ class Parser:
             }),
 
             "Case-stmts": TransitionDFA({
-                1: {("Case-stmt", False): 2},
+                1: {("Case-stmt", False): 2,
+                    ("Epsilon", True): -1},
                 2: {("Case-stmts", False): -1}
             }),
 
@@ -311,7 +317,8 @@ class Parser:
             }),
 
             "Default-stmt": TransitionDFA({
-                1: {("default", True): 2},
+                1: {("default", True): 2,
+                    ("Epsilon", True): -1},
                 2: {(":", True): 3},
                 3: {("Statement-list", False): -1},
             }),
@@ -339,7 +346,8 @@ class Parser:
             }),
 
             "C": TransitionDFA({
-                1: {("Relop", False): 2},
+                1: {("Relop", False): 2,
+                    ("Epsilon", True): -1},
                 2: {("Additive-expression", False): -1}
             }),
 
@@ -369,7 +377,8 @@ class Parser:
             }),
 
             "D": TransitionDFA({
-                1: {("Addop", False): 2},
+                1: {("Addop", False): 2,
+                    ("Epsilon", True): -1},
                 2: {("Term", False): 3},
                 3: {("D", False): -1}
             }),
@@ -390,7 +399,8 @@ class Parser:
             }),
 
             "G": TransitionDFA({
-                1: {("*", True): 2},
+                1: {("*", True): 2,
+                    ("Epsilon", True): -1},
                 2: {("Signed-factor", False): 3},
                 3: {("G", False): -1}
             }),
@@ -432,7 +442,8 @@ class Parser:
             }),
 
             "Var-prime": TransitionDFA({
-                1: {("[", True): 2},
+                1: {("[", True): 2,
+                    ("Epsilon", True): -1},
                 2: {("Expression", False): 3},
                 3: {("]", True): -1},
             }),
@@ -449,7 +460,8 @@ class Parser:
             }),
 
             "Args": TransitionDFA({
-                1: {("Arg-list", False): -1},
+                1: {("Arg-list", False): -1,
+                    ("Epsilon", True): -1},
             }),
 
             "Arg-list": TransitionDFA({
@@ -458,11 +470,11 @@ class Parser:
             }),
 
             "Arg-list-prime": TransitionDFA({
-                1: {(",", True): 2},
+                1: {(",", True): 2,
+                    ("Epsilon", True): -1},
                 2: {("Expression", False): 3},
                 3: {("Arg-list-prime", False): -1},
             }),
-
         }
 
     def is_nullable(self, V):
@@ -480,6 +492,13 @@ class Parser:
             for var, is_terminal in transitions[current_state].keys():
                 c = self.current_token.translate_for_parser()
                 value = self.current_token.to_str()
+
+                if var == "Epsilon":
+                    if c in self.follow[V]:
+                        current_state = -1
+                        Node("epsilon", me)
+                        break
+
                 if is_terminal:
                     if c == var:
                         if c == Token.EOF:
@@ -512,8 +531,10 @@ class Parser:
                     else:
                         if self.is_nullable(var):
                             if c in self.follow[var]:
-                                node = Node(var, me)
-                                Node("ε", node)
+                                result, node = self.parse_from_non_terminal(var)
+                                node.parent = me
+                                if not result:
+                                    return False, me
                                 current_state = transitions[current_state][(var, False)]
                                 break
 
