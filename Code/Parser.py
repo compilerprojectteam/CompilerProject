@@ -28,128 +28,36 @@ class Parser:
         self.current_token = None
         self.scanner_tokens = self.scanner.scan_file_ignore_extra(file_name)
 
-    def init_dfas(self):
-        self.first = {
-            "Program": ["EOF", "int", "void"],
-            "Declaration-list": ["", "int", "void"],
-            "Declaration": ["int", "void"],
-            "Declaration-initial": ["int", "void"],
-            "Declaration-prime": ["(", ";", "["],
-            "Var-declaration-prime": [";", "["],
-            "Fun-declaration-prime": ["("],
-            "Type-specifier": ["int", "void"],
-            "Params": ["int", "void"],
-            "Param-list-void-abtar": ["ID", ""],
-            "Param-list": [",", ""],
-            "Param": ["int", "void"],
-            "Param-prime": ["", "["],
-            "Compound-stmt": ["{"],
-            "Statement-list": ["", "{", "continue", "break", ";", "if", "while", "return",
-                               "switch", "ID", "+", "-", "(", "NUM"],
-            "Statement": ["{", "continue", "break", ";", "if", "while", "return", "switch", "ID", "+", "-", "(", "NUM"],
-            "Expression-stmt": ["continue", "break", ";", "ID", "+", "-", "(", "NUM"],
-            "Selection-stmt": ["if"],
-            "Iteration-stmt": ["while"],
-            "Return-stmt": ["return"],
-            "Return-stmt-prime": [";", "ID", "+", "-", "(", "NUM"],
-            "Switch-stmt": ["switch"],
-            "Case-stmts": ["", "Case"],
-            "Case-stmt": ["Case"],
-            "Default-stmt": ["default", ""],
-            "Expression": ["ID", "+", "-", "(", "NUM"],
-            "B": ["=", "(", "[", "*", "+", "-", "==", "<", ""],
-            "Simple-expression-zegond": ["+", "-", "(", "NUM"],
-            "Simple-expression-prime": ["(", "[", "*", "+", "-", "==", "<", ""],
-            "C": ["", "==", "<"],
-            "Relop": ["==", "<"],
-            "Addop": ["+", "-"],
-            "Additive-expression": ["+", "-", "(", "NUM", "ID"],
-            "Additive-expression-prime": ["(", "[", "*", "+", "-", ""],
-            "Additive-expression-zegond": ["+", "-", "(", "NUM"],
-            "D": ["+", "-", ""],
-            "Term": ["+", "-", "(", "NUM", "ID"],
-            "Term-prime": ["(", "[", "*", ""],
-            "Term-zegond": ["+", "-", "(", "NUM"],
-            "G": ["*", ""],
-            "Signed-factor": ["+", "-", "(", "NUM", "ID"],
-            "Signed-factor-prime": ["(", "[", ""],
-            "Signed-factor-zegond": ["+", "-", "(", "NUM"],
-            "Factor": ["(", "NUM", "ID"],
-            "Var-call-prime": ["(", "[", ""],
-            "Var-prime": ["[", ""],
-            "Factor-prime": ["(", "[", ""],
-            "Factor-zegond": ["(", "NUM"],
-            "Args": ["", "ID", "+", "-", "(", "NUM"],
-            "Arg-list": ["ID", "+", "-", "(", "NUM"],
-            "Arg-list-prime": [",", ""],
-        }
+    @staticmethod
+    def load_dict(name):
+        dictionary = {}
 
-        self.follow = {
-            "Program": ["$"],
-            "Declaration-list": ["EOF", "{", "continue", "break", ";", "if", "while", "return", "switch", "ID", "+",
-                                 "-", "(", "NUM", "}"],
-            "Declaration": ["int", "void", "EOF", "{", "continue", "break", ";", "if", "while", "return", "switch",
-                            "ID", "+", "-", "(", "NUM", "}"],
-            "Declaration-initial": ["(", ";", "[", ",", ")"],
-            "Declaration-prime": ["int", "void", "EOF", "{", "continue", "break", ";", "if", "while", "return",
-                                  "switch", "ID", "+", "-", "(", "NUM", "}"],
-            "Var-declaration-prime": ["int", "void", "EOF", "{", "continue", "break", ";", "if", "while", "return",
-                                      "switch", "ID", "+", "-", "(", "NUM", "}"],
-            "Fun-declaration-prime": ["int", "void", "EOF", "{", "continue", "break", ";", "if", "while", "return",
-                                      "switch", "ID", "+", "-", "(", "NUM", "}"],
-            "Type-specifier": ["ID"],
-            "Params": [")"],
-            "Param-list-void-abtar": [")"],
-            "Param-list": [")"],
-            "Param": [",", ")"],
-            "Param-prime": [",", ")"],
-            "Compound-stmt": ["int", "void", "EOF", "{", "continue", "break", ";", "if", "while", "return", "switch",
-                              "ID", "+", "-", "(", "NUM", "}", "else", "Case", "default"],
-            "Statement-list": ["}", "Case", "default"],
-            "Statement": ["{", "continue", "break", ";", "if", "while", "return", "switch", "ID", "+", "-", "(", "NUM",
-                          "}", "else", "Case", "default"],
-            "Expression-stmt": ["{", "continue", "break", ";", "if", "while", "return", "switch", "ID", "+", "-", "(",
-                                "NUM", "}", "else", "Case", "default"],
-            "Selection-stmt": ["{", "continue", "break", ";", "if", "while", "return", "switch", "ID", "+", "-", "(",
-                               "NUM", "}", "else", "Case", "default"],
-            "Iteration-stmt": ["{", "continue", "break", ";", "if", "while", "return", "switch", "ID", "+", "-", "(",
-                               "NUM", "}", "else", "Case", "default"],
-            "Return-stmt": ["{", "continue", "break", ";", "if", "while", "return", "switch", "ID", "+", "-", "(",
-                            "NUM", "}", "else", "Case", "default"],
-            "Return-stmt-prime": ["{", "continue", "break", ";", "if", "while", "return", "switch", "ID", "+", "-", "(",
-                                  "NUM", "}", "else", "Case", "default"],
-            "Switch-stmt": ["{", "continue", "break", ";", "if", "while", "return", "switch", "ID", "+", "-", "(",
-                            "NUM", "}", "else", "Case", "default"],
-            "Case-stmts": ["default", "}"],
-            "Case-stmt": ["Case", "default", "}"],
-            "Default-stmt": ["}"],
-            "Expression": [";", ")", "]", ","],
-            "B": [";", ")", "]", ","],
-            "Simple-expression-zegond": [";", ")", "]", ","],
-            "Simple-expression-prime": [";", ")", "]", ","],
-            "C": [";", ")", "]", ","],
-            "Relop": ["+", "-", "(", "NUM", "ID"],
-            "Addop": ["+", "-", "(", "NUM", "ID"],
-            "Additive-expression": [";", ")", "]", ","],
-            "Additive-expression-prime": ["==", "<", ";", ")", "]", ","],
-            "Additive-expression-zegond": ["==", "<", ";", ")", "]", ","],
-            "D": [";", ")", "==", "<", "]", ","],
-            "Term": ["+", "-", ";", ")", "==", "<", "]", ","],
-            "Term-prime": ["+", "-", "==", "<", ";", ")", "]", ","],
-            "Term-zegond": ["+", "-", "==", "<", ";", ")", "]", ","],
-            "G": ["+", "-", ";", ")", "==", "<", "]", ","],
-            "Signed-factor": ["*", "+", "-", ";", ")", "==", "<", "]", ","],
-            "Signed-factor-prime": ["*", "+", "-", "==", "<", ";", ")", "]", ","],
-            "Signed-factor-zegond": ["*", "+", "-", "==", "<", ";", ")", "]", ","],
-            "Factor": ["*", "+", "-", ";", ")", "==", "<", "]", ","],
-            "Var-call-prime": ["*", "+", "-", ";", ")", "==", "<", "]", ","],
-            "Var-prime": ["*", "+", "-", ";", ")", "==", "<", "]", ","],
-            "Factor-prime": ["*", "+", "-", "==", "<", ";", ")", "]", ","],
-            "Factor-zegond": ["*", "+", "-", "==", "<", ";", ")", "]", ","],
-            "Args": [")"],
-            "Arg-list": [")"],
-            "Arg-list-prime": [")"],
-        }
+        with open(name + ".csv") as f:
+            for a in f.readlines():
+                key = a[:a.find("\t")]
+                value = a[a.find("\t") + 1:]
+
+                value = value.replace(",,", " virgol ")
+                value = value.replace(", ,", " virgol ")
+                value = value.replace(",", " ")
+                value = value.replace("virgol", ",")
+
+                values = value.split()
+                values = [a.replace("ε", "")
+                              .replace("id", "ID")
+                              .replace("voID", "void")
+                              .replace("num", "NUM")
+                              .replace("eof", "EOF") for a in values]
+
+                dictionary[key] = values
+
+            return dictionary
+
+    def init_dfas(self):
+
+        self.first = Parser.load_dict("first")
+
+        self.follow = Parser.load_dict("follow")
 
         self.dfas = {
             "Program": TransitionDFA({
@@ -200,16 +108,18 @@ class Parser:
 
             "Params": TransitionDFA({
                 1: {("int", True): 2,
-                    ("void", True): 4},
+                    ("void", True): 5},
                 2: {("ID", True): 3},
-                3: {("Param-list", False): -1},
-                4: {("Param-list-void-abtar", False): -1}
+                3: {("Param-prime", False): 4},
+                4: {("Param-list", False): -1},
+                5: {("Param-list-void-abtar", False): -1}
             }),
 
             "Param-list-void-abtar": TransitionDFA({
                 1: {("ID", True): 2,
                     ("Epsilon", True): -1},
-                2: {("Param-list", False): -1},
+                2: {("Param-prime", False): 3},
+                3: {("Param-list", False): -1},
             }),
 
             "Param-list": TransitionDFA({
@@ -331,9 +241,23 @@ class Parser:
 
             "B": TransitionDFA({
                 1: {("=", True): 2,
+                    ("[", True): 3,
                     ("Simple-expression-prime", False): -1},
-                2: {("Expression", False): -1}
+                2: {("Expression", False): -1},
+                3: {("Expression", False): 4},
+                4: {("]", True): 5},
+                5: {("H", False): -1}
             }),
+
+            "H": TransitionDFA({
+                1: {("=", True): 2,
+                    ("G", False): 3},
+                2: {("Expression", False): -1},
+                3: {("D", False): 4},
+                4: {("C", False): -1},
+            }),
+
+
 
             "Simple-expression-zegond": TransitionDFA({
                 1: {("Additive-expression-zegond", False): 2},
@@ -449,7 +373,10 @@ class Parser:
             }),
 
             "Factor-prime": TransitionDFA({
-                1: {("Var-call-prime", False): -1},
+                1: {("Epsilon", True): -1,
+                    ("(", True): 2},
+                2: {("Args", False): 3},
+                3: {(")", True): -1},
             }),
 
             "Factor-zegond": TransitionDFA({
@@ -480,6 +407,15 @@ class Parser:
     def is_nullable(self, V):
         return "" in self.first[V]
 
+    def get_next_token(self):
+
+        while True:
+            self.current_token, self.current_line_number = next(self.scanner_tokens)
+            if self.current_token.type != Token.ERROR:
+                return
+            else:
+                error("Scanner: Error in line " + str(self.current_line_number) + ": " + self.current_token.value)
+
     def parse_from_non_terminal(self, V):
         print("parsing from non terminal : ", V)
         me = Node(V, parent=None)
@@ -506,7 +442,7 @@ class Parser:
                             Node(c, parent=me)
                             break
                         else:
-                            self.current_token, self.current_line_number = next(self.scanner_tokens)
+                            self.get_next_token()
                             current_state = transitions[current_state][(var, True)]
                             Node(value, parent=me)
                             break
@@ -547,12 +483,12 @@ class Parser:
                                 error("#{} : Syntax Error! Unexpected EndOfFile".format(self.current_line_number))
                                 return False, me
                             else:
-                                error("#{} : Syntax Error! Unexpected {} {}".format(self.current_line_number, c, V))
-                                self.current_token, self.current_line_number = next(self.scanner_tokens)
+                                error("#{} : Syntax Error! Unexpected {}".format(self.current_line_number, c))
+                                self.get_next_token()
         return True, me
 
     def parse(self):
-        self.current_token, self.current_line_number = next(self.scanner_tokens)
+        self.get_next_token()
         status, tree_root = self.parse_from_non_terminal("Program")
         for pre, fill, node in RenderTree(tree_root):
             parser_output.write("%s%s" % (pre, node.name))
@@ -562,7 +498,11 @@ class Parser:
 if __name__ == "__main__":
     parser_errors = open("parser-error.txt", "w", encoding="utf-8")
     parser_output = open("parser-output.txt", "w", encoding="utf-8")
-    p = Parser("simple.nc")
+    p = Parser("doc_code.nc")
+
+    dickt = Parser.load_dict("first")
+    print(",\n".join(map(str, (['"' + str(x) + "\" : " + str(y) for x, y in zip(dickt.keys(), dickt.values())]))))
+
     p.parse()
     # scanner_output.close()
     # parser_output.close()

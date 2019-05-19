@@ -235,7 +235,7 @@ class Scanner:
 
     def scan_file_ignore_extra(self, file_name):
         for token, line_number in self.scan_file(file_name):
-            if token.type == Token.WHITE_SPACE or token.type == Token.COMMENT or token.type == Token.ERROR:
+            if token.type == Token.WHITE_SPACE or token.type == Token.COMMENT:
                 continue
             print("new Token: ", token.translate_for_parser())
             yield token, line_number
@@ -250,7 +250,7 @@ if __name__ == "__main__":
     scanner_output = open("scanner.txt", "w")
     lexical_errors = open("lexical_errors.txt", "w")
 
-    for token, last_line_number in scanner.scan_file("simple.nc"):
+    for token, last_line_number in scanner.scan_file("doc_code.nc"):
         if token.type == Token.WHITE_SPACE or token.type == Token.COMMENT:
             continue
 

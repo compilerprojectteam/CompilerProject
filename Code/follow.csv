@@ -1,0 +1,52 @@
+Program	$
+Declaration-list	eof, {, continue, break, ;, if, while, return, switch, id, +, -, (, num, }
+Declaration	int, void, eof, {, continue, break, ;, if, while, return, switch, id, +, -, (, num, }
+Declaration-initial	(, ;, [, ,, )
+Declaration-prime	int, void, eof, {, continue, break, ;, if, while, return, switch, id, +, -, (, num, }
+Var-declaration-prime	int, void, eof, {, continue, break, ;, if, while, return, switch, id, +, -, (, num, }
+Fun-declaration-prime	int, void, eof, {, continue, break, ;, if, while, return, switch, id, +, -, (, num, }
+Type-specifier	id
+Params	)
+Param-list-void-abtar	)
+Param-list	)
+Param	,, )
+Param-prime	,, )
+Compound-stmt	int, void, eof, {, continue, break, ;, if, while, return, switch, id, +, -, (, num, }, else, case, default
+Statement-list	}, case, default
+Statement	{, continue, break, ;, if, while, return, switch, id, +, -, (, num, }, else, case, default
+Expression-stmt	{, continue, break, ;, if, while, return, switch, id, +, -, (, num, }, else, case, default
+Selection-stmt	{, continue, break, ;, if, while, return, switch, id, +, -, (, num, }, else, case, default
+Iteration-stmt	{, continue, break, ;, if, while, return, switch, id, +, -, (, num, }, else, case, default
+Return-stmt	{, continue, break, ;, if, while, return, switch, id, +, -, (, num, }, else, case, default
+Return-stmt-prime	{, continue, break, ;, if, while, return, switch, id, +, -, (, num, }, else, case, default
+Switch-stmt	{, continue, break, ;, if, while, return, switch, id, +, -, (, num, }, else, case, default
+Case-stmts	default, }
+Case-stmt	case, default, }
+Default-stmt	}
+Expression	;, ), ], ,
+B	;, ), ], ,
+H	;, ), ], ,
+Simple-expression-zegond	;, ), ], ,
+Simple-expression-prime	;, ), ], ,
+C	;, ), ], ,
+Relop	+, -, (, num, id
+Addop	+, -, (, num, id
+Additive-expression	;, ), ], ,
+Additive-expression-prime	==, <, ;, ), ], ,
+Additive-expression-zegond	==, <, ;, ), ], ,
+D	==, <, ;, ), ], ,
+Term	+, -, ;, ), ==, <, ], ,
+Term-prime	+, -, ==, <, ;, ), ], ,
+Term-zegond	+, -, ==, <, ;, ), ], ,
+G	+, -, ==, <, ;, ), ], ,
+Signed-factor	*, +, -, ;, ), ==, <, ], ,
+Signed-factor-prime	*, +, -, ==, <, ;, ), ], ,
+Signed-factor-zegond	*, +, -, ==, <, ;, ), ], ,
+Factor	*, +, -, ;, ), ==, <, ], ,
+Var-call-prime	*, +, -, ;, ), ==, <, ], ,
+Var-prime	*, +, -, ;, ), ==, <, ], ,
+Factor-prime	*, +, -, ==, <, ;, ), ], ,
+Factor-zegond	*, +, -, ==, <, ;, ), ], ,
+Args	)
+Arg-list	)
+Arg-list-prime	)

@@ -1,0 +1,52 @@
+Program	eof, int, void
+Declaration-list	ε, int, void
+Declaration	int, void
+Declaration-initial	int, void
+Declaration-prime	(, ;, [
+Var-declaration-prime	;, [
+Fun-declaration-prime	(
+Type-specifier	int, void
+Params	int, void
+Param-list-void-abtar	id, ε
+Param-list	,, ε
+Param	int, void
+Param-prime	ε, [
+Compound-stmt	{
+Statement-list	ε, {, continue, break, ;, if, while, return, switch, id, +, -, (, num
+Statement	{, continue, break, ;, if, while, return, switch, id, +, -, (, num
+Expression-stmt	continue, break, ;, id, +, -, (, num
+Selection-stmt	if
+Iteration-stmt	while
+Return-stmt	return
+Return-stmt-prime	;, id, +, -, (, num
+Switch-stmt	switch
+Case-stmts	ε, case
+Case-stmt	case
+Default-stmt	default, ε
+Expression	id, +, -, (, num
+B	=, [, (, *, +, -, ==, <, ε
+H	=, *, +, -, ε, ==, <
+Simple-expression-zegond	+, -, (, num
+Simple-expression-prime	(, *, +, -, ==, <, ε
+C	ε, ==, <
+Relop	==, <
+Addop	+, -
+Additive-expression	+, -, (, num, id
+Additive-expression-prime	(, *, +, -, ε
+Additive-expression-zegond	+, -, (, num
+D	+, -, ε
+Term	+, -, (, num, id
+Term-prime	(, *, ε
+Term-zegond	+, -, (, num
+G	*, ε
+Signed-factor	+, -, (, num, id
+Signed-factor-prime	(, ε
+Signed-factor-zegond	+, -, (, num
+Factor	(, num, id
+Var-call-prime	(, [, ε
+Var-prime	[, ε
+Factor-prime	(, ε
+Factor-zegond	(, num
+Args	ε, id, +, -, (, num
+Arg-list	id, +, -, (, num
+Arg-list-prime	,, ε
