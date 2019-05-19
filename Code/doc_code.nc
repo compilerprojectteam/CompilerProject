@@ -14,8 +14,6 @@ int foo(int d, int e){
         d = d - 1;
         if (d == 4)
             break;
-        else
-            break;
     }
     // comment1
     return f + b;
@@ -28,7 +26,7 @@ void main(void){
     arr = b + -3;
     arr = foo(arr[0], arr[1]);
     if (b /* comment2 */ == 3){
-        arr = -7;
+        arr[0] = -7;
     }
     else
     {   switch(arr[2]) {

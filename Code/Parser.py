@@ -414,7 +414,7 @@ class Parser:
             if self.current_token.type != Token.ERROR:
                 return
             else:
-                error("Scanner: Error in line " + str(self.current_line_number) + ": " + self.current_token.value)
+                error("Lexical Error in line #{} : invalid token {}".format(self.current_line_number, self.current_token.value))
 
     def parse_from_non_terminal(self, V):
         print("parsing from non terminal : ", V)
