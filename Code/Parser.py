@@ -424,25 +424,33 @@ class Parser:
         transitions = current_dfa.transitions
 
         while current_state > 0:
+
             for var, is_terminal in transitions[current_state].keys():
                 c = self.current_token.translate_for_parser()
                 value = self.current_token.to_str()
 
                 if var == "Epsilon":
                     if c in self.follow[V]:
+                        # TODO : call terminal's before
                         current_state = -1
                         Node("epsilon", me)
+                        # TODO : call terminal's after
                         break
 
                 if is_terminal:
                     if c == var:
                         if c == Token.EOF:
+                            # TODO : call terminal's before
                             current_state = transitions[current_state][(var, True)]
+                            # TODO : call terminal's after
                             Node(c, parent=me)
                             break
                         else:
+                            # TODO : call terminal's before
                             self.get_next_token()
                             current_state = transitions[current_state][(var, True)]
+                            # TODO : call terminal's after
+
                             Node(value, parent=me)
                             break
                     else:
@@ -457,7 +465,9 @@ class Parser:
                 else:
 
                     if c in self.first[var]:
+                        # TODO : before e oon non-terminal
                         result, node = self.parse_from_non_terminal(var)
+                        # TODO : after e oon non-terminal
                         node.parent = me
                         if not result:
                             return False, me
@@ -466,7 +476,9 @@ class Parser:
                     else:
                         if self.is_nullable(var):
                             if c in self.follow[var]:
+                                # TODO : before e oon non-terminal
                                 result, node = self.parse_from_non_terminal(var)
+                                # TODO : after e oon non-terminal
                                 node.parent = me
                                 if not result:
                                     return False, me
