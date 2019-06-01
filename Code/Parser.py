@@ -32,7 +32,7 @@ class Parser:
     def load_dict(name):
         dictionary = {}
 
-        with open("../resources/" + name + ".csv") as f:
+        with open("../resources/" + name + ".csv", encoding='utf-8') as f:
             for a in f.readlines():
                 key = a[:a.find("\t")]
                 value = a[a.find("\t") + 1:]
@@ -257,8 +257,6 @@ class Parser:
                 4: {("C", False): -1},
             }),
 
-
-
             "Simple-expression-zegond": TransitionDFA({
                 1: {("Additive-expression-zegond", False): 2},
                 2: {("C", False): -1}
@@ -414,7 +412,8 @@ class Parser:
             if self.current_token.type != Token.ERROR:
                 return
             else:
-                error("Lexical Error in line #{} : invalid token {}".format(self.current_line_number, self.current_token.value))
+                error("Lexical Error in line #{} : invalid token {}".format(self.current_line_number,
+                                                                            self.current_token.value))
 
     def parse_from_non_terminal(self, V):
         print("parsing from non terminal : ", V)
