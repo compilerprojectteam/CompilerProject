@@ -1,5 +1,5 @@
 dickt = {}
-with open(".csv", encoding=) as f:
+with open(".csv", encoding='utf-8') as f:
     for a in f.readlines():
         key = a[:a.find("\t")]
         value = a[a.find("\t") + 1:]
