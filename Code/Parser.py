@@ -32,7 +32,7 @@ class Parser:
     def load_dict(name):
         dictionary = {}
 
-        with open(name + ".csv") as f:
+        with open("../resources/" + name + ".csv") as f:
             for a in f.readlines():
                 key = a[:a.find("\t")]
                 value = a[a.find("\t") + 1:]
@@ -496,9 +496,9 @@ class Parser:
 
 
 if __name__ == "__main__":
-    parser_errors = open("parser-error.txt", "w", encoding="utf-8")
-    parser_output = open("parser-output.txt", "w", encoding="utf-8")
-    p = Parser("doc_code.nc")
+    parser_errors = open("../out/parser-error.txt", "w", encoding="utf-8")
+    parser_output = open("../out/parser-output.txt", "w", encoding="utf-8")
+    p = Parser("../input/doc_code.nc")
 
     dickt = Parser.load_dict("first")
     print(",\n".join(map(str, (['"' + str(x) + "\" : " + str(y) for x, y in zip(dickt.keys(), dickt.values())]))))

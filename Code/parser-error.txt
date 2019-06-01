@@ -1,4 +1,0 @@
-Lexical Error in line #12 : invalid token >
-#12 : Syntax Error! Unexpected NUM
-#17 : Syntax Error! Missing else
-#17 : Syntax Error! Missing Statement
