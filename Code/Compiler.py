@@ -10,6 +10,9 @@ class TransitionDFA:
         self.transitions = transitions
 
 
+def print_semantic_error(error):
+    print(error)
+
 class SematicActions:
     """
     Args:
@@ -22,7 +25,22 @@ class SematicActions:
         self.type = None
 
     def start(self, ct):
-        self.st.start_new_scope()
+        self.st.start_new_scope("normal")
+
+    def inc_n_args(self, ct):
+        self.st.last_symbol[-2].n_args += 1
+
+    def void_type_error(self, ct):
+        print_semantic_error("error")
+
+    def start_normal_scope(self, ct):
+        self.st.start_new_scope("normal")
+
+    def start_function_scope(self, ct):
+        self.st.start_new_scope("function")
+
+    def close_scope(self, ct):
+        self.st.remove_last_scope()
 
     def save_type(self, ct):
         self.type = ct.value
@@ -36,14 +54,38 @@ class SematicActions:
 
     def set_var_address(self, ct):
         last_symbol = self.st.get_last_symbol()
-        last_symbol.address = self.st.heap_pointer
 
-    def inc_heap_pointer_default(self, ct):
-        self.st.heap_pointer += 4
+        if self.st.get_current_memory_type() == "stack":
+            i = len(self.st.scope_type) - 1
+            while True:
+                if self.st.scope_type[i] == "function":
+                    last_symbol.address = self.st.stack_pointer[i]
+                    break
+                i -= 1
+        else:
+            last_symbol.address = self.st.heap_pointer
 
-    def inc_heap_pointer_array(self, ct):
-        self.st.heap_pointer += 4 * int(ct.value)
+    def inc_var_pointer_default(self, ct):
+        if self.st.get_current_memory_type() == "stack":
+            i = len(self.st.scope_type) - 1
+            while True:
+                if self.st.scope_type[i] == "function":
+                    self.st.stack_pointer[i] += 4
+                    break
+                i -= 1
+        else:
+            self.st.heap_pointer += 4
 
+    def inc_var_pointer_array(self, ct):
+        if self.st.get_current_memory_type() == "stack":
+            i = len(self.st.scope_type) - 1
+            while True:
+                if self.st.scope_type[i] == "function":
+                    self.st.stack_pointer[i] += 4 * int(ct.value)
+                    break
+                i -= 1
+        else:
+            self.st.heap_pointer += 4 * int(ct.value)
 
 
 class Symbol:
@@ -61,22 +103,31 @@ class Symbol:
 
 
 class SymbolTable:
+    STACK_BASE = 1500
+    STACK_BLOCK_SIZE = 100
+
     def __init__(self):
         self.symbol_table = []
 
-        self.last_symbols = []
+        self.last_symbol = []
+        self.scope_type = []
+        self.stack_pointer = []
 
-        self.last_symbol = None
-        self.heap_pointer = 500
-        self.stack_pointer = None
+        self.heap_pointer = 1000
+        self.temp_pointer = 500
 
-    def start_new_scope(self):
-        self.last_symbols.append(None)
+    def start_new_scope(self, stype):
+        self.last_symbol.append(None)
         self.symbol_table.append({})
+        self.scope_type.append(stype)
+        self.stack_pointer.append(-SymbolTable.STACK_BLOCK_SIZE)
+
+        if stype == "function":
+            self.last_symbol[-2].is_function = True
 
     def remove_last_scope(self):
         self.symbol_table.pop()
-        self.last_symbols.pop()
+        self.last_symbol.pop()
 
     def resolve_symbol(self, name):
         for scope_symbol_table in self.symbol_table[::-1]:
@@ -86,15 +137,18 @@ class SymbolTable:
 
     def add_symbol(self, name, ttype):
         symbol = Symbol(ttype=ttype)
-        self.last_symbols[-1] = symbol
+        self.last_symbol[-1] = symbol
         self.symbol_table[-1][name] = symbol
 
     def get_last_symbol(self):
         """
-        :returns last_symbols[-1]
+        :returns last_symbol[-1]
         :rtype Symbol
         """
-        return self.last_symbols[-1]
+        return self.last_symbol[-1]
+
+    def get_current_memory_type(self):
+        return "stack" if len(self.symbol_table) > 1 else "heap"
 
 
 def error(message):
@@ -118,8 +172,6 @@ class Parser:
         self.first = {}
         self.follow = {}
         self.init_dfas()
-
-
 
     @staticmethod
     def load_dict(name):
@@ -180,15 +232,15 @@ class Parser:
             }),
 
             "Var-declaration-prime": TransitionDFA({
-                1: {(";", True): (-1, [self.sa.inc_heap_pointer_default], []),
+                1: {(";", True): (-1, [self.sa.inc_var_pointer_default], []),
                     ("[", True): (2, [], [])},
-                2: {("NUM", True): (3, [self.sa.inc_heap_pointer_array], [])},
+                2: {("NUM", True): (3, [self.sa.inc_var_pointer_array], [])},
                 3: {("]", True): (4, [], [])},
                 4: {(";", True): (-1, [], [])},
             }),
 
             "Fun-declaration-prime": TransitionDFA({
-                1: {("(", True): (2, [], [])},
+                1: {("(", True): (2, [self.sa.start_function_scope], [])},
                 2: {("Params", False): (3, [], [])},
                 3: {(")", True): (4, [], [])},
                 4: {("Compound-stmt", False): (-1, [], [])},
@@ -200,24 +252,24 @@ class Parser:
             }),
 
             "Params": TransitionDFA({
-                1: {("int", True): (2, [], []),
+                1: {("int", True): (2, [self.sa.save_type], []),
                     ("void", True): (5, [], [])},
-                2: {("ID", True): (3, [], [])},
+                2: {("ID", True): (3, [self.sa.create_symbol], [])},
                 3: {("Param-prime", False): (4, [], [])},
                 4: {("Param-list", False): (-1, [], [])},
                 5: {("Param-list-void-abtar", False): (-1, [], [])}
             }),
 
             "Param-list-void-abtar": TransitionDFA({
-                1: {("ID", True): (2, [], []),
+                1: {("ID", True): (2, [self.sa.void_type_error], []),
                     ("Epsilon", True): (-1, [], [])},
                 2: {("Param-prime", False): (3, [], [])},
                 3: {("Param-list", False): (-1, [], [])},
             }),
 
             "Param-list": TransitionDFA({
-                1: {(",", True): (2, [], []),
-                    ("Epsilon", True): (-1, [], [])},
+                1: {(",", True): (2, [self.sa.inc_n_args], []),
+                    ("Epsilon", True): (-1, [self.sa.inc_n_args], [])},
                 2: {("Param", False): (3, [], [])},
                 3: {("Param-list", False): (-1, [], [])},
             }),
@@ -237,7 +289,7 @@ class Parser:
                 1: {("{", True): (2, [], [])},
                 2: {("Declaration-list", False): (3, [], [])},
                 3: {("Statement-list", False): (4, [], [])},
-                4: {("}", True): (-1, [], [])}
+                4: {("}", True): (-1, [], [self.sa.close_scope])}
             }),
 
             "Statement-list": TransitionDFA({
@@ -248,7 +300,7 @@ class Parser:
 
             "Statement": TransitionDFA({
                 1: {("Expression-stmt", False): (-1, [], []),
-                    ("Compound-stmt", False): (-1, [], []),
+                    ("Compound-stmt", False): (-1, [self.sa.start_normal_scope], []),
                     ("Selection-stmt", False): (-1, [], []),
                     ("Iteration-stmt", False): (-1, [], []),
                     ("Return-stmt", False): (-1, [], []),

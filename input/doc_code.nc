@@ -41,6 +41,7 @@ void main(void){
                 break;}
             default:
                 b = b - -1;
-        }}
+        }
+    }
     return;
 }
