@@ -125,7 +125,32 @@ Program
 │       │               │       │               │   │           │               └── epsilon
 │       │               │       │               │   │           └── (SYMBOL, ;) 
 │       │               │       │               │   └── Statement-list
-│       │               │       │               │       └── epsilon
+│       │               │       │               │       ├── Statement
+│       │               │       │               │       │   └── Expression-stmt
+│       │               │       │               │       │       ├── Expression
+│       │               │       │               │       │       │   ├── (ID, f) 
+│       │               │       │               │       │       │   └── B
+│       │               │       │               │       │       │       ├── (SYMBOL, =) 
+│       │               │       │               │       │       │       └── Expression
+│       │               │       │               │       │       │           ├── (ID, b) 
+│       │               │       │               │       │       │           └── B
+│       │               │       │               │       │       │               ├── (SYMBOL, =) 
+│       │               │       │               │       │       │               └── Expression
+│       │               │       │               │       │       │                   └── Simple-expression-zegond
+│       │               │       │               │       │       │                       ├── Additive-expression-zegond
+│       │               │       │               │       │       │                       │   ├── Term-zegond
+│       │               │       │               │       │       │                       │   │   ├── Signed-factor-zegond
+│       │               │       │               │       │       │                       │   │   │   └── Factor-zegond
+│       │               │       │               │       │       │                       │   │   │       └── (NUM, 5) 
+│       │               │       │               │       │       │                       │   │   └── G
+│       │               │       │               │       │       │                       │   │       └── epsilon
+│       │               │       │               │       │       │                       │   └── D
+│       │               │       │               │       │       │                       │       └── epsilon
+│       │               │       │               │       │       │                       └── C
+│       │               │       │               │       │       │                           └── epsilon
+│       │               │       │               │       │       └── (SYMBOL, ;) 
+│       │               │       │               │       └── Statement-list
+│       │               │       │               │           └── epsilon
 │       │               │       │               └── (SYMBOL, }) 
 │       │               │       └── Declaration-list
 │       │               │           ├── Declaration
@@ -140,7 +165,16 @@ Program
 │       │               │           │           ├── (SYMBOL, ]) 
 │       │               │           │           └── (SYMBOL, ;) 
 │       │               │           └── Declaration-list
-│       │               │               └── epsilon
+│       │               │               ├── Declaration
+│       │               │               │   ├── Declaration-initial
+│       │               │               │   │   ├── Type-specifier
+│       │               │               │   │   │   └── (KEYWORD, int) 
+│       │               │               │   │   └── (ID, g) 
+│       │               │               │   └── Declaration-prime
+│       │               │               │       └── Var-declaration-prime
+│       │               │               │           └── (SYMBOL, ;) 
+│       │               │               └── Declaration-list
+│       │               │                   └── epsilon
 │       │               ├── Statement-list
 │       │               │   ├── Statement
 │       │               │   │   └── Expression-stmt
@@ -506,12 +540,21 @@ Program
 │               │               │   │   ├── Declaration-initial
 │               │               │   │   │   ├── Type-specifier
 │               │               │   │   │   │   └── (KEYWORD, int) 
-│               │               │   │   │   └── (ID, a) 
+│               │               │   │   │   └── (ID, u) 
 │               │               │   │   └── Declaration-prime
 │               │               │   │       └── Var-declaration-prime
 │               │               │   │           └── (SYMBOL, ;) 
 │               │               │   └── Declaration-list
-│               │               │       └── epsilon
+│               │               │       ├── Declaration
+│               │               │       │   ├── Declaration-initial
+│               │               │       │   │   ├── Type-specifier
+│               │               │       │   │   │   └── (KEYWORD, int) 
+│               │               │       │   │   └── (ID, a) 
+│               │               │       │   └── Declaration-prime
+│               │               │       │       └── Var-declaration-prime
+│               │               │       │           └── (SYMBOL, ;) 
+│               │               │       └── Declaration-list
+│               │               │           └── epsilon
 │               │               ├── Statement-list
 │               │               │   ├── Statement
 │               │               │   │   └── Expression-stmt
@@ -1038,3 +1081,25 @@ Program
 │               │               │                   │               │   │       │       │       │                   │       │   └── G
 │               │               │                   │               │   │       │       │       │                   │       │       └── epsilon
 │               │               │                   │               │   │       │       │       │                   │       └── D
+│               │               │                   │               │   │       │       │       │                   │           └── epsilon
+│               │               │                   │               │   │       │       │       │                   └── C
+│               │               │                   │               │   │       │       │       │                       └── epsilon
+│               │               │                   │               │   │       │       │       └── (SYMBOL, ;) 
+│               │               │                   │               │   │       │       └── Statement-list
+│               │               │                   │               │   │       │           └── epsilon
+│               │               │                   │               │   │       └── (SYMBOL, }) 
+│               │               │                   │               │   └── Statement-list
+│               │               │                   │               │       └── epsilon
+│               │               │                   │               └── (SYMBOL, }) 
+│               │               │                   └── Statement-list
+│               │               │                       ├── Statement
+│               │               │                       │   └── Return-stmt
+│               │               │                       │       ├── (KEYWORD, return) 
+│               │               │                       │       └── Return-stmt-prime
+│               │               │                       │           └── (SYMBOL, ;) 
+│               │               │                       └── Statement-list
+│               │               │                           └── epsilon
+│               │               └── (SYMBOL, }) 
+│               └── Declaration-list
+│                   └── epsilon
+└── EOF

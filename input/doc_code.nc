@@ -3,8 +3,10 @@ int foo(int d, int e){
     int f;
     void foo2(int k[]) {
         return k[0] + k[2];
+        f = b = 5;
     }
     int fff[2];
+    int g;
     fff[0] = d;
     fff[1] = d + 1;
     f = foo2(fff);
@@ -20,6 +22,7 @@ int foo(int d, int e){
 }
 int arr[3];
 void main(void){
+    int u;
     int a;
     a = -3 + +11;
     b = 5 * a  + foo(a,a);

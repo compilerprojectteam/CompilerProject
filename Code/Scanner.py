@@ -237,7 +237,7 @@ class Scanner:
         for token, line_number in self.scan_file(file_name):
             if token.type == Token.WHITE_SPACE or token.type == Token.COMMENT:
                 continue
-            print("new Token: ", token.translate_for_parser())
+            # print("new Token: ", token.translate_for_parser())
             yield token, line_number
 
 

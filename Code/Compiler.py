@@ -1,3 +1,4 @@
+from Code.Utils import *
 from Code.Scanner import *
 from anytree import Node, RenderTree
 
@@ -10,10 +11,7 @@ class TransitionDFA:
         self.transitions = transitions
 
 
-def print_semantic_error(error):
-    print(error)
-
-class SematicActions:
+class SemanticActions:
     """
     Args:
          symbol_table (SymbolTable)
@@ -23,12 +21,119 @@ class SematicActions:
         self.st = symbol_table
         self.i = 0
         self.type = None
+        self.stack = []
+        self.stack_flags = []
+        self.code_block = []
+
+    def push(self, t, flag=""):
+        self.stack.append(t)
+        self.stack_flags.append(flag)
+
+    def poop(self):
+        s = self.stack.pop()
+        f = self.stack_flags.pop()
+        return s, f
+
+    def add_code(self, code):
+        self.i += 1
+        self.code_block.append(code)
+
+    def assign(self, ct):
+        rhs, rhs_type = self.poop()
+        lhs, lhs_type = self.poop()
+        self.add_code("(ASSIhhhhhGN, {}{}, {}{})".format("@" if rhs_type == "indirect" else "",
+                                                         rhs,
+                                                         "@" if lhs_type == "indirect" else "",
+                                                         lhs))
+        self.push(lhs, lhs_type)
+
+    def save_to_temp(self, ct):
+        t = self.st.get_temp()
+        self.add_code("(ASSIGN, #{}, {})".format(int(ct.value), t))
+        self.push(t, "")
+
+    def add_to_var(self, ct):
+        exp, exp_type = self.poop()
+        addr, addr_type = self.poop()
+        self.add_code("(MULT, {}, #4, {})".format(exp, exp))
+        t = self.st.get_temp()
+        self.add_code("(ADD, {}, {}, {})".format(addr, exp, addr))
+        self.push(addr, "")
 
     def start(self, ct):
         self.st.start_new_scope("normal")
 
+    def pid(self, ct):
+        id_name = ct.value
+        symbol = self.st.resolve_symbol(id_name)
+        if not symbol:
+            print_semantic_error("ID {} is not defined".format(id_name))
+            return
+
+        self.code_block.append(id_name)
+        if symbol.is_function:
+            self.push(symbol.address, "function")
+        elif symbol.location == "heap":
+            if symbol.is_array:
+                self.push(symbol.address, "direct array")
+            else:
+                self.push(symbol.address, "direct int")
+        else:
+            if symbol.is_reference and symbol.is_array:
+                pointer = SymbolTable.STACK_BASE
+                t = self.st.get_temp()
+                self.add_code("(ASSIGN, {}, {})".format(pointer, t))
+                for i in range(len(self.st.symbol_table))[::-1]:
+                    if id_name in self.st.symbol_table[i]:
+                        tf = self.st.get_temp()
+                        self.add_code("(ADD, {}, #{}, {})".format(t, symbol.address, tf))
+                        self.add_code("(ASSIGN, @{}, {})".format(tf, tf))
+                        self.push(tf, "indirect")
+                        break
+                    if self.st.scope_type == "function":
+                        function_symbol = self.st.last_symbol[i - 1]
+                        q_displacement = ((function_symbol.n_args + SymbolTable.N_STACK_VARS) * 4
+                                          - SymbolTable.STACK_BLOCK_SIZE)
+                        t2 = self.st.get_temp()
+                        self.add_code("(ADD, {}, #{}, {})".format(t, q_displacement, t2))
+                        self.add_code("(ASSIGN, @{}, {})".format(t2, t2))
+                        t = t2
+                        pass
+
+                pass
+            else:
+                pointer = SymbolTable.STACK_BASE
+                t = self.st.get_temp()
+                self.add_code("(ASSIGN, {}, {})".format(pointer, t))
+                for i in range(len(self.st.symbol_table))[::-1]:
+                    if id_name in self.st.symbol_table[i]:
+                        tf = self.st.get_temp()
+                        self.add_code("(ADD, {}, #{}, {})".format(t, symbol.address, tf))
+                        self.push(tf, "indirect")
+                        break
+                    if self.st.scope_type == "function":
+                        function_symbol = self.st.last_symbol[i - 1]
+                        q_displacement = ((function_symbol.n_args + SymbolTable.N_STACK_VARS) * 4
+                                          - SymbolTable.STACK_BLOCK_SIZE)
+                        t2 = self.st.get_temp()
+                        self.add_code("(ADD, {}, #{}, {})".format(t, q_displacement, t2))
+                        self.add_code("(ASSIGN, @{}, {})".format(t2, t2))
+                        t = t2
+                        pass
+
+                pass
+
+    def set_var_type_reference(self, ct):
+        self.st.last_symbol[-1].is_reference = True
+        self.st.last_symbol[-1].is_array = True
+
     def inc_n_args(self, ct):
+        self.st.last_symbol[-2].args.append("array" if self.st.last_symbol[-1].is_reference else "int")
         self.st.last_symbol[-2].n_args += 1
+
+    def save_stack(self, ct):
+        i = self.st.get_last_function_scope()
+        self.st.stack_pointer[i] += 4
 
     def void_type_error(self, ct):
         print_semantic_error("error")
@@ -56,34 +161,24 @@ class SematicActions:
         last_symbol = self.st.get_last_symbol()
 
         if self.st.get_current_memory_type() == "stack":
-            i = len(self.st.scope_type) - 1
-            while True:
-                if self.st.scope_type[i] == "function":
-                    last_symbol.address = self.st.stack_pointer[i]
-                    break
-                i -= 1
+            i = self.st.get_last_function_scope()
+            last_symbol.location = "stack"
+            last_symbol.address = self.st.stack_pointer[i]
+
         else:
             last_symbol.address = self.st.heap_pointer
 
     def inc_var_pointer_default(self, ct):
         if self.st.get_current_memory_type() == "stack":
-            i = len(self.st.scope_type) - 1
-            while True:
-                if self.st.scope_type[i] == "function":
-                    self.st.stack_pointer[i] += 4
-                    break
-                i -= 1
+            i = self.st.get_last_function_scope()
+            self.st.stack_pointer[i] += 4
         else:
             self.st.heap_pointer += 4
 
     def inc_var_pointer_array(self, ct):
         if self.st.get_current_memory_type() == "stack":
-            i = len(self.st.scope_type) - 1
-            while True:
-                if self.st.scope_type[i] == "function":
-                    self.st.stack_pointer[i] += 4 * int(ct.value)
-                    break
-                i -= 1
+            i = self.st.get_last_function_scope()
+            self.st.stack_pointer[i] += 4 * int(ct.value)
         else:
             self.st.heap_pointer += 4 * int(ct.value)
 
@@ -91,11 +186,12 @@ class SematicActions:
 class Symbol:
     def __init__(self, ttype="int", address=-1):
         self.address = address
-        self.location = "HEAP"
+        self.location = "heap"
         self.type = ttype
         self.is_function = False
+        self.is_reference = False
         self.is_array = False
-        self.length = 1
+        self.length = 4
 
         self.block_size = 0
         self.n_args = 0
@@ -103,6 +199,7 @@ class Symbol:
 
 
 class SymbolTable:
+    N_STACK_VARS = 1
     STACK_BASE = 1500
     STACK_BLOCK_SIZE = 100
 
@@ -114,7 +211,11 @@ class SymbolTable:
         self.stack_pointer = []
 
         self.heap_pointer = 1000
-        self.temp_pointer = 500
+        self.temp_pointer = 496
+
+    def get_temp(self):
+        self.temp_pointer += 4
+        return self.temp_pointer
 
     def start_new_scope(self, stype):
         self.last_symbol.append(None)
@@ -126,8 +227,19 @@ class SymbolTable:
             self.last_symbol[-2].is_function = True
 
     def remove_last_scope(self):
+        print_symbol_table(self)
+        print("_" * 100)
         self.symbol_table.pop()
         self.last_symbol.pop()
+        self.stack_pointer.pop()
+        self.scope_type.pop()
+
+    def get_last_function_scope(self):
+        i = len(self.scope_type) - 1
+        while True:
+            if self.scope_type[i] == "function":
+                return i
+            i -= 1
 
     def resolve_symbol(self, name):
         for scope_symbol_table in self.symbol_table[::-1]:
@@ -164,7 +276,7 @@ class Parser:
     def __init__(self, file_name):
         self.scanner = Scanner()
         self.st = SymbolTable()
-        self.sa = SematicActions(self.st)
+        self.sa = SemanticActions(self.st)
         self.scanner_tokens = self.scanner.scan_file_ignore_extra(file_name)
 
         self.current_token = None
@@ -207,7 +319,7 @@ class Parser:
         self.dfas = {
             "Program": TransitionDFA({
                 1: {("Declaration-list", False): (2, [self.sa.start], [])},
-                2: {("EOF", True): (-1, [], [])}
+                2: {("EOF", True): (-1, [self.sa.close_scope], [])}
             }),
 
             "Declaration-list": TransitionDFA({
@@ -243,7 +355,7 @@ class Parser:
                 1: {("(", True): (2, [self.sa.start_function_scope], [])},
                 2: {("Params", False): (3, [], [])},
                 3: {(")", True): (4, [], [])},
-                4: {("Compound-stmt", False): (-1, [], [])},
+                4: {("Compound-stmt", False): (-1, [self.sa.save_stack, self.sa.save_stack], [])},
             }),
 
             "Type-specifier": TransitionDFA({
@@ -255,7 +367,7 @@ class Parser:
                 1: {("int", True): (2, [self.sa.save_type], []),
                     ("void", True): (5, [], [])},
                 2: {("ID", True): (3, [self.sa.create_symbol], [])},
-                3: {("Param-prime", False): (4, [], [])},
+                3: {("Param-prime", False): (4, [self.sa.set_var_address, self.sa.inc_var_pointer_default], [])},
                 4: {("Param-list", False): (-1, [], [])},
                 5: {("Param-list-void-abtar", False): (-1, [], [])}
             }),
@@ -276,11 +388,11 @@ class Parser:
 
             "Param": TransitionDFA({
                 1: {("Declaration-initial", False): (2, [], [])},
-                2: {("Param-prime", False): (-1, [], [])}
+                2: {("Param-prime", False): (-1, [self.sa.set_var_address, self.sa.inc_var_pointer_default], [])}
             }),
 
             "Param-prime": TransitionDFA({
-                1: {("[", True): (2, [], []),
+                1: {("[", True): (2, [self.sa.set_var_type_reference], []),
                     ("Epsilon", True): (-1, [], [])},
                 2: {("]", True): (-1, [], [])}
             }),
@@ -379,7 +491,7 @@ class Parser:
             }),
 
             "Expression": TransitionDFA({
-                1: {("ID", True): (2, [], []),
+                1: {("ID", True): (2, [self.sa.pid], []),
                     ("Simple-expression-zegond", False): (-1, [], [])},
                 2: {("B", False): (-1, [], [])}
             }),
@@ -388,16 +500,16 @@ class Parser:
                 1: {("=", True): (2, [], []),
                     ("[", True): (3, [], []),
                     ("Simple-expression-prime", False): (-1, [], [])},
-                2: {("Expression", False): (-1, [], [])},
+                2: {("Expression", False): (-1, [], [self.sa.assign])},
                 3: {("Expression", False): (4, [], [])},
-                4: {("]", True): (5, [], [])},
+                4: {("]", True): (5, [self.sa.add_to_var], [])},
                 5: {("H", False): (-1, [], [])}
             }),
 
             "H": TransitionDFA({
                 1: {("=", True): (2, [], []),
                     ("G", False): (3, [], [])},
-                2: {("Expression", False): (-1, [], [])},
+                2: {("Expression", False): (-1, [], [self.sa.assign])},
                 3: {("D", False): (4, [], [])},
                 4: {("C", False): (-1, [], [])},
             }),
@@ -495,7 +607,7 @@ class Parser:
             "Factor": TransitionDFA({
                 1: {("(", True): (2, [], []),
                     ("NUM", True): (-1, [], []),
-                    ("ID", True): (3, [], [])},
+                    ("ID", True): (3, [self.sa.pid], [])},
                 2: {("Expression", False): (4, [], [])},
                 3: {("Var-call-prime", False): (-1, [], [])},
                 4: {(")", True): (-1, [], [])},
@@ -512,7 +624,7 @@ class Parser:
                 1: {("[", True): (2, [], []),
                     ("Epsilon", True): (-1, [], [])},
                 2: {("Expression", False): (3, [], [])},
-                3: {("]", True): (-1, [], [])},
+                3: {("]", True): (-1, [self.sa.add_to_var], [])},
             }),
 
             "Factor-prime": TransitionDFA({
@@ -524,7 +636,7 @@ class Parser:
 
             "Factor-zegond": TransitionDFA({
                 1: {("(", True): (2, [], []),
-                    ("NUM", True): (-1, [], [])},
+                    ("NUM", True): (-1, [self.sa.save_to_temp], [])},
                 2: {("Expression", False): (3, [], [])},
                 3: {(")", True): (-1, [], [])},
             }),
@@ -561,7 +673,7 @@ class Parser:
                                                                             self.current_token.value))
 
     def parse_from_non_terminal(self, V):
-        print("parsing from non terminal : ", V)
+        # print("parsing from non terminal : ", V)
         me = Node(V, parent=None)
 
         current_dfa = self.dfas[V]
@@ -576,6 +688,10 @@ class Parser:
 
                 if var == "Epsilon":
                     if c in self.follow[V]:
+                        current_state, fs_before, fs_after = transitions[current_state][(var, True)]
+                        [f(self.current_token) for f in fs_before]
+                        [f(self.current_token) for f in fs_after]
+
                         current_state = -1
                         Node("epsilon", me)
                         break
@@ -660,10 +776,8 @@ if __name__ == "__main__":
     parser_output = open("../out/parser-output.txt", "w", encoding="utf-8")
     p = Parser("../input/doc_code.nc")
 
-    dickt = Parser.load_dict("first")
-    print(",\n".join(map(str, (['"' + str(x) + "\" : " + str(y) for x, y in zip(dickt.keys(), dickt.values())]))))
-
     p.parse()
     print(p.st.symbol_table)
+    print("\n".join(p.sa.code_block))
     # scanner_output.close()
     # parser_output.close()
