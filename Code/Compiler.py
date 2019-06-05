@@ -41,9 +41,13 @@ class SemanticActions:
     def assign(self, ct):
         rhs, rhs_type = self.poop()
         lhs, lhs_type = self.poop()
-        self.add_code("(ASSIhhhhhGN, {}{}, {}{})".format("@" if rhs_type == "indirect" else "",
+
+        rhs_indirect = rhs_type == "indirect" or rhs_type == "direct array"
+        lhs_indirect = lhs_type == "indirect" or lhs_type == "direct array"
+
+        self.add_code("(ASSIhhhhhGN, {}{}, {}{})".format("@" if rhs_indirect else "",
                                                          rhs,
-                                                         "@" if lhs_type == "indirect" else "",
+                                                         "@" if lhs_indirect else "",
                                                          lhs))
         self.push(lhs, lhs_type)
 
@@ -58,7 +62,7 @@ class SemanticActions:
         self.add_code("(MULT, {}, #4, {})".format(exp, exp))
         t = self.st.get_temp()
         self.add_code("(ADD, {}, {}, {})".format(addr, exp, addr))
-        self.push(addr, "")
+        self.push(addr, "indirect")
 
     def start(self, ct):
         self.st.start_new_scope("normal")
@@ -75,7 +79,9 @@ class SemanticActions:
             self.push(symbol.address, "function")
         elif symbol.location == "heap":
             if symbol.is_array:
-                self.push(symbol.address, "direct array")
+                t = self.st.get_temp()
+                self.add_code("(ASSIGN, #{}, {})".format(symbol.address, t))
+                self.push(t, "direct array")
             else:
                 self.push(symbol.address, "direct int")
         else:
@@ -176,6 +182,7 @@ class SemanticActions:
             self.st.heap_pointer += 4
 
     def inc_var_pointer_array(self, ct):
+        self.st.last_symbol[-1].is_array = True
         if self.st.get_current_memory_type() == "stack":
             i = self.st.get_last_function_scope()
             self.st.stack_pointer[i] += 4 * int(ct.value)
@@ -774,7 +781,7 @@ class Parser:
 if __name__ == "__main__":
     parser_errors = open("../out/parser-error.txt", "w", encoding="utf-8")
     parser_output = open("../out/parser-output.txt", "w", encoding="utf-8")
-    p = Parser("../input/doc_code.nc")
+    p = Parser("../input/test.nc")
 
     p.parse()
     print(p.st.symbol_table)
