@@ -1,7 +1,13 @@
 def print_symbol(symbol):
     d = symbol.__dict__
     for field in sorted(d.keys()):
-        print("\t {}: {}".format(field, d[field]))
+        if field == 'parent_func':
+            if d[field]:
+                print("\t {}: {}".format(field, d[field].name))
+            else:
+                print("\t {}: {}".format(field, d[field]))
+        else:
+            print("\t {}: {}".format(field, d[field]))
 
 
 def print_symbol_table(symbol_table):

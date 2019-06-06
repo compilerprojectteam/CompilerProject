@@ -1,6 +1,7 @@
 from Code.Utils import *
 from Code.Scanner import *
 from anytree import Node, RenderTree
+import os
 
 parser_errors = None
 scanner_output = None
@@ -24,6 +25,7 @@ class SemanticActions:
         self.stack = []
         self.stack_flags = []
         self.code_block = []
+        self.arg_counter = []
 
     def push(self, t, flag=""):
         self.stack.append(t)
@@ -38,96 +40,168 @@ class SemanticActions:
         self.i += 1
         self.code_block.append(code)
 
+    def pop_stack(self, ct):
+        self.poop()
+
+    def save(self, ct):
+        if self.st.last_symbol[-1].name != "main":
+            self.push(self.i, "")
+            self.add_code("")
+
+    def push_arg(self, ct):
+        t = self.st.get_temp()
+        self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
+        self.add_code("(ADD, {}, #{}, {})".format(t, self.arg_counter[-1], t))
+        exp, exp_type = self.poop()
+        self.add_code("(ASSIGN, {}{}, @{})".format(exp,
+                                                   "@" if exp_type == "indirect" else "",
+                                                   t))
+        self.arg_counter[-1] += 4
+
+    def inc_stack_pointer(self, ct):
+        self.add_code("(ADD, {}, #{}, {})".format(SymbolTable.STACK_BASE,
+                                                  SymbolTable.STACK_BLOCK_SIZE,
+                                                  SymbolTable.STACK_BASE, ))
+
+    def dec_stack_pointer(self, ct):
+        self.add_code("(SUB, {}, #{}, {})".format(SymbolTable.STACK_BASE,
+                                                  SymbolTable.STACK_BLOCK_SIZE,
+                                                  SymbolTable.STACK_BASE, ))
+
+    def push_arg_counter(self, ct):
+        self.arg_counter.append(-SymbolTable.STACK_BLOCK_SIZE)
+
+    def pop_arg_counter(self, ct):
+        self.arg_counter.pop()
+
+    def push_func_stuff(self, ct):
+        t = self.st.get_temp()
+        self.arg_counter[-1] += 4
+
+        function_symbol, _ = self.poop()
+        function_address, _ = self.poop()
+
+        parent_func = function_symbol.parent_func
+
+        if parent_func:
+            q = 1
+
+            func_being_declared = self.st.last_symbol[self.st.get_last_function_scope() - 1]
+
+            if func_being_declared == parent_func:
+                self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
+                self.add_code("(ADD, {}, #{}, {})".format(t, self.arg_counter[-1], t))
+                t2 = self.st.get_temp()
+                self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t2))
+                self.add_code("(SUB, {}, #{}, {})".format(t2, 100, t2))
+                self.add_code("(ASSIGN, {}, @{})".format(t2, t))
+
+            else:
+                current_temp = self.st.get_temp()
+                parent_q_offset = 4 * (func_being_declared.n_args + SymbolTable.N_STACK_VARS)
+                self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, current_temp))
+                self.add_code("(ADD, {}, #{}, {})".format(current_temp,
+                                                          -2 * SymbolTable.STACK_BLOCK_SIZE + parent_q_offset,
+                                                          current_temp))
+
+                for i in range(len(self.st.symbol_table))[::-1]:
+                    if self.st.scope_type[i] != "function":
+                        continue
+
+                    current_func = self.st.last_symbol[i - 1]
+
+                    if current_func.parent_func == parent_func:
+                        break
+                    else:
+                        self.add_code("(ASSIGN, @{}, {})".format(current_temp, current_temp))
+                        parent_q_offset = -SymbolTable.STACK_BLOCK_SIZE + 4 * (
+                            current_func.parent_func.n_args + SymbolTable.N_STACK_VARS)
+                        self.add_code("(ADD, {}, #{}, {})".format(current_temp, parent_q_offset, current_temp))
+
+                self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
+                self.add_code("(ADD, {}, #{}, {})".format(t, self.arg_counter[-1], t))
+                self.add_code("(ASSIGN, @{}, @{})".format(current_temp, t))
+
+        self.arg_counter[-1] -= 4
+        self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
+        self.add_code("(ADD, {}, #{}, {})".format(t, self.arg_counter[-1], t))
+        self.add_code("(ASSIGN, #{}, @{})".format(self.i + 2, t))
+        self.arg_counter[-1] += 8
+
+        self.add_code("(JP, {})".format(function_symbol.address))
+
+        ret_value = self.st.get_temp()
+        self.add_code("(ASSIGN, {}, {})".format(SymbolTable.RETURN_VALUE,
+                                                ret_value))
+        self.push(ret_value, "")
+
     def assign(self, ct):
         rhs, rhs_type = self.poop()
         lhs, lhs_type = self.poop()
 
-        rhs_indirect = rhs_type == "indirect" or rhs_type == "direct array"
-        lhs_indirect = lhs_type == "indirect" or lhs_type == "direct array"
-
-        self.add_code("(ASSIhhhhhGN, {}{}, {}{})".format("@" if rhs_indirect else "",
-                                                         rhs,
-                                                         "@" if lhs_indirect else "",
-                                                         lhs))
+        self.add_code("(ASSIGN, {}{}, {}{})".format("@" if rhs_type == "indirect" else "",
+                                                    rhs,
+                                                    "@" if lhs_type == "indirect" else "",
+                                                    lhs))
         self.push(lhs, lhs_type)
 
     def save_to_temp(self, ct):
         t = self.st.get_temp()
         self.add_code("(ASSIGN, #{}, {})".format(int(ct.value), t))
-        self.push(t, "")
+        self.push(t, "direct")
 
     def add_to_var(self, ct):
         exp, exp_type = self.poop()
         addr, addr_type = self.poop()
         self.add_code("(MULT, {}, #4, {})".format(exp, exp))
-        t = self.st.get_temp()
         self.add_code("(ADD, {}, {}, {})".format(addr, exp, addr))
         self.push(addr, "indirect")
 
     def start(self, ct):
+        self.add_code("(ASSIGN, #0, {})".format(SymbolTable.RETURN_VALUE))
+
+        self.add_code("(ASSIGN, #{}, {})".format(SymbolTable.STACK_SEGMENT_ADDRESS,
+                                                 SymbolTable.STACK_BASE))
         self.st.start_new_scope("normal")
 
     def pid(self, ct):
         id_name = ct.value
         symbol = self.st.resolve_symbol(id_name)
         if not symbol:
+            if symbol == "output":
+                pass
             print_semantic_error("ID {} is not defined".format(id_name))
             return
 
         self.code_block.append(id_name)
         if symbol.is_function:
             self.push(symbol.address, "function")
+            self.push(symbol, "symbol")
+
         elif symbol.location == "heap":
             if symbol.is_array:
                 t = self.st.get_temp()
                 self.add_code("(ASSIGN, #{}, {})".format(symbol.address, t))
-                self.push(t, "direct array")
+                self.push(t, "direct")
             else:
-                self.push(symbol.address, "direct int")
+                self.push(symbol.address, "direct")
         else:
-            if symbol.is_reference and symbol.is_array:
-                pointer = SymbolTable.STACK_BASE
-                t = self.st.get_temp()
-                self.add_code("(ASSIGN, {}, {})".format(pointer, t))
-                for i in range(len(self.st.symbol_table))[::-1]:
-                    if id_name in self.st.symbol_table[i]:
-                        tf = self.st.get_temp()
-                        self.add_code("(ADD, {}, #{}, {})".format(t, symbol.address, tf))
-                        self.add_code("(ASSIGN, @{}, {})".format(tf, tf))
-                        self.push(tf, "indirect")
-                        break
-                    if self.st.scope_type == "function":
-                        function_symbol = self.st.last_symbol[i - 1]
-                        q_displacement = ((function_symbol.n_args + SymbolTable.N_STACK_VARS) * 4
-                                          - SymbolTable.STACK_BLOCK_SIZE)
-                        t2 = self.st.get_temp()
-                        self.add_code("(ADD, {}, #{}, {})".format(t, q_displacement, t2))
-                        self.add_code("(ASSIGN, @{}, {})".format(t2, t2))
-                        t = t2
-                        pass
-
-                pass
-            else:
-                pointer = SymbolTable.STACK_BASE
-                t = self.st.get_temp()
-                self.add_code("(ASSIGN, {}, {})".format(pointer, t))
-                for i in range(len(self.st.symbol_table))[::-1]:
-                    if id_name in self.st.symbol_table[i]:
-                        tf = self.st.get_temp()
-                        self.add_code("(ADD, {}, #{}, {})".format(t, symbol.address, tf))
-                        self.push(tf, "indirect")
-                        break
-                    if self.st.scope_type == "function":
-                        function_symbol = self.st.last_symbol[i - 1]
-                        q_displacement = ((function_symbol.n_args + SymbolTable.N_STACK_VARS) * 4
-                                          - SymbolTable.STACK_BLOCK_SIZE)
-                        t2 = self.st.get_temp()
-                        self.add_code("(ADD, {}, #{}, {})".format(t, q_displacement, t2))
-                        self.add_code("(ASSIGN, @{}, {})".format(t2, t2))
-                        t = t2
-                        pass
-
-                pass
+            pointer = SymbolTable.STACK_BASE
+            t = self.st.get_temp()
+            self.add_code("(ASSIGN, {}, {})".format(pointer, t))
+            for i in range(len(self.st.symbol_table))[::-1]:
+                if id_name in self.st.symbol_table[i]:
+                    self.add_code("(ADD, {}, #{}, {})".format(t, symbol.address, t))
+                    if symbol.is_reference:
+                        self.add_code("(ASSIGN, @{}, {})".format(t, t))
+                    self.push(t, "indirect")
+                    break
+                if self.st.scope_type[i] == "function":
+                    function_symbol = self.st.last_symbol[i - 1]
+                    q_displacement = ((function_symbol.n_args + SymbolTable.N_STACK_VARS) * 4
+                                      - SymbolTable.STACK_BLOCK_SIZE)
+                    self.add_code("(ADD, {}, #{}, {})".format(t, q_displacement, t))
+                    self.add_code("(ASSIGN, @{}, {})".format(t, t))
 
     def set_var_type_reference(self, ct):
         self.st.last_symbol[-1].is_reference = True
@@ -136,6 +210,19 @@ class SemanticActions:
     def inc_n_args(self, ct):
         self.st.last_symbol[-2].args.append("array" if self.st.last_symbol[-1].is_reference else "int")
         self.st.last_symbol[-2].n_args += 1
+
+    def return_code(self, ct):
+        func_symbol = self.st.last_symbol[-1]
+        if func_symbol.name != "main":
+            offset = -SymbolTable.STACK_BLOCK_SIZE + func_symbol.n_args * 4
+            t = self.st.get_temp()
+            self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
+            self.add_code("(ADD, {}, #{}, {})".format(t, offset, t))
+            self.add_code("(ASSIGN, @{}, {})".format(t, t))
+            self.add_code("(JP, @{})".format(t))
+            # print(self.stack, self.stack_flags)
+            backpatch, _ = self.poop()
+            self.code_block[backpatch] = ("(JP, {})".format(self.i))
 
     def save_stack(self, ct):
         i = self.st.get_last_function_scope()
@@ -162,6 +249,10 @@ class SemanticActions:
     def set_fun_address(self, ct):
         last_symbol = self.st.get_last_symbol()
         last_symbol.address = self.i
+
+        if len(self.st.symbol_table) > 1:
+            i = self.st.get_last_function_scope()
+            last_symbol.parent_func = self.st.last_symbol[i - 1]
 
     def set_var_address(self, ct):
         last_symbol = self.st.get_last_symbol()
@@ -191,7 +282,8 @@ class SemanticActions:
 
 
 class Symbol:
-    def __init__(self, ttype="int", address=-1):
+    def __init__(self, name, ttype="int", address=-1):
+        self.name = name
         self.address = address
         self.location = "heap"
         self.type = ttype
@@ -203,11 +295,14 @@ class Symbol:
         self.block_size = 0
         self.n_args = 0
         self.args = []
+        self.parent_func = None
 
 
 class SymbolTable:
+    STACK_SEGMENT_ADDRESS = 2000
     N_STACK_VARS = 1
     STACK_BASE = 1500
+    RETURN_VALUE = 1504
     STACK_BLOCK_SIZE = 100
 
     def __init__(self):
@@ -247,6 +342,8 @@ class SymbolTable:
             if self.scope_type[i] == "function":
                 return i
             i -= 1
+            if i < 0:
+                return 0
 
     def resolve_symbol(self, name):
         for scope_symbol_table in self.symbol_table[::-1]:
@@ -255,7 +352,7 @@ class SymbolTable:
         return False
 
     def add_symbol(self, name, ttype):
-        symbol = Symbol(ttype=ttype)
+        symbol = Symbol(name, ttype=ttype)
         self.last_symbol[-1] = symbol
         self.symbol_table[-1][name] = symbol
 
@@ -346,7 +443,7 @@ class Parser:
             }),
 
             "Declaration-prime": TransitionDFA({
-                1: {("Fun-declaration-prime", False): (-1, [self.sa.set_fun_address], []),
+                1: {("Fun-declaration-prime", False): (-1, [self.sa.save, self.sa.set_fun_address], []),
                     ("Var-declaration-prime", False): (-1, [self.sa.set_var_address], [])},
             }),
 
@@ -362,7 +459,7 @@ class Parser:
                 1: {("(", True): (2, [self.sa.start_function_scope], [])},
                 2: {("Params", False): (3, [], [])},
                 3: {(")", True): (4, [], [])},
-                4: {("Compound-stmt", False): (-1, [self.sa.save_stack, self.sa.save_stack], [])},
+                4: {("Compound-stmt", False): (-1, [self.sa.save_stack, self.sa.save_stack], [self.sa.return_code])},
             }),
 
             "Type-specifier": TransitionDFA({
@@ -431,7 +528,7 @@ class Parser:
                     ("continue", True): (3, [], []),
                     ("break", True): (4, [], []),
                     (";", True): (-1, [], [])},
-                2: {(";", True): (-1, [], [])},
+                2: {(";", True): (-1, [self.sa.pop_stack], [])},
                 3: {(";", True): (-1, [], [])},
                 4: {(";", True): (-1, [], [])}
             }),
@@ -622,9 +719,10 @@ class Parser:
 
             "Var-call-prime": TransitionDFA({
                 1: {("Var-prime", False): (-1, [], []),
-                    ("(", True): (2, [], [])},
+                    ("(", True): (2, [self.sa.push_arg_counter, self.sa.inc_stack_pointer], [])},
                 2: {("Args", False): (3, [], [])},
-                3: {(")", True): (-1, [], [])},
+                3: {(")", True): (
+                    -1, [self.sa.push_func_stuff, self.sa.pop_arg_counter, self.sa.dec_stack_pointer], [])},
             }),
 
             "Var-prime": TransitionDFA({
@@ -636,9 +734,10 @@ class Parser:
 
             "Factor-prime": TransitionDFA({
                 1: {("Epsilon", True): (-1, [], []),
-                    ("(", True): (2, [], [])},
+                    ("(", True): (2, [self.sa.push_arg_counter, self.sa.inc_stack_pointer], [])},
                 2: {("Args", False): (3, [], [])},
-                3: {(")", True): (-1, [], [])},
+                3: {(")", True): (
+                    -1, [self.sa.push_func_stuff, self.sa.pop_arg_counter, self.sa.dec_stack_pointer], [])},
             }),
 
             "Factor-zegond": TransitionDFA({
@@ -659,8 +758,8 @@ class Parser:
             }),
 
             "Arg-list-prime": TransitionDFA({
-                1: {(",", True): (2, [], []),
-                    ("Epsilon", True): (-1, [], [])},
+                1: {(",", True): (2, [self.sa.push_arg], []),
+                    ("Epsilon", True): (-1, [self.sa.push_arg], [])},
                 2: {("Expression", False): (3, [], [])},
                 3: {("Arg-list-prime", False): (-1, [], [])},
             }),
@@ -785,6 +884,18 @@ if __name__ == "__main__":
 
     p.parse()
     print(p.st.symbol_table)
-    print("\n".join(p.sa.code_block))
-    # scanner_output.close()
-    # parser_output.close()
+    # print("\n".join(p.sa.code_block))
+
+    with open("../out/output.txt", mode='w') as f:
+        i = 0
+        for line in p.sa.code_block:
+            if line.startswith("("):
+                f.write("{}\t{}\n".format(i, line))
+                print("{}\t{}".format(i, line))
+                i += 1
+            else:
+                print(line)
+        f.close()
+
+    os.chdir("../out/")
+    os.system("tester.exe")

@@ -3,11 +3,11 @@ Declaration-list -> Declaration Declaration-list
 Declaration-list -> ε
 Declaration -> Declaration-initial Declaration-prime
 Declaration-initial -> #save_type Type-specifier #create_symbol id
-Declaration-prime -> #set_fun_address Fun-declaration-prime
+Declaration-prime -> #save #set_fun_address Fun-declaration-prime
 Declaration-prime -> #set_var_address Var-declaration-prime
 Var-declaration-prime -> #inc_var_pointer_default ;
 Var-declaration-prime -> [ #inc_var_pointer_array num ] ;
-Fun-declaration-prime -> #start_function_scope ( Params ) #save_stack #save_stack Compound-stmt
+Fun-declaration-prime -> #start_function_scope ( Params ) #save_stack #save_stack Compound-stmt #return_code
 Type-specifier -> int
 Type-specifier -> void
 Params -> #save_type int #create_symbol id #set_var_address #inc_var_pointer_default Param-Prime Param-list
@@ -28,7 +28,7 @@ Statement -> Selection-stmt
 Statement -> Iteration-stmt
 Statement -> Return-stmt
 Statement -> Switch-stmt
-Expression-stmt -> Expression ;
+Expression-stmt -> Expression ; #pop_stack
 Expression-stmt -> continue ;
 Expression-stmt -> break ;
 Expression-stmt -> ;
@@ -91,11 +91,11 @@ Factor -> num
 Factor -> #pid id Var-call-prime
 
 Var-call-prime -> Var-prime
-Var-call-prime -> ( Args )
+Var-call-prime -> #push_arg_counter #inc_stack_pointer ( Args #push_func_stuff #pop_arg_counter #dec_stack_pointer)
 Var-prime -> [ Expression #add_to_var ]
 Var-prime -> ε
 
-Factor-prime -> ( Args )
+Factor-prime -> #push_arg_counter #inc_stack_pointer ( Args #push_func_stuff #pop_arg_counter #dec_stack_pointer)
 Factor-prime -> ε
 
 
@@ -105,5 +105,5 @@ Factor-zegond -> #save_to_temp num
 Args -> Arg-list
 Args -> ε
 Arg-list ->  Expression Arg-list-prime
-Arg-list-prime -> , Expression Arg-list-prime
-Arg-list-prime -> ε
+Arg-list-prime -> #push_arg , Expression Arg-list-prime
+Arg-list-prime -> #push_arg ε
