@@ -1,10 +1,11 @@
-//int b;
-int f(void){
-    int b;
-    b = 3;
+int f(int g, int h){
+    output(g);
+    output(h);
 }
 
 void main(void) {
-    int c;
-    c = f();
+    int g[8];
+    g[0] = 2;
+    g[1] = 5;
+    f(g[0], g[1]);
 }

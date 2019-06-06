@@ -91,11 +91,11 @@ Factor -> num
 Factor -> #pid id Var-call-prime
 
 Var-call-prime -> Var-prime
-Var-call-prime -> #push_arg_counter #inc_stack_pointer ( Args #push_func_stuff #pop_arg_counter #dec_stack_pointer)
+Var-call-prime -> #push_arg_counter ( Args #inc_stack_pointer #push_func_stuff #pop_arg_counter #dec_stack_pointer)
 Var-prime -> [ Expression #add_to_var ]
 Var-prime -> ε
 
-Factor-prime -> #push_arg_counter #inc_stack_pointer ( Args #push_func_stuff #pop_arg_counter #dec_stack_pointer)
+Factor-prime -> #push_arg_counter ( Args #inc_stack_pointer #push_func_stuff #pop_arg_counter #dec_stack_pointer)
 Factor-prime -> ε
 
 

@@ -51,10 +51,10 @@ class SemanticActions:
     def push_arg(self, ct):
         t = self.st.get_temp()
         self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
-        self.add_code("(ADD, {}, #{}, {})".format(t, self.arg_counter[-1], t))
+        self.add_code("(ADD, {}, #{}, {})".format(t, SymbolTable.STACK_BLOCK_SIZE + self.arg_counter[-1], t))
         exp, exp_type = self.poop()
-        self.add_code("(ASSIGN, {}{}, @{})".format(exp,
-                                                   "@" if exp_type == "indirect" else "",
+        self.add_code("(ASSIGN, {}{}, @{})".format("@" if exp_type == "indirect" else "",
+                                                   exp,
                                                    t))
         self.arg_counter[-1] += 4
 
@@ -128,7 +128,13 @@ class SemanticActions:
         self.add_code("(ASSIGN, #{}, @{})".format(self.i + 2, t))
         self.arg_counter[-1] += 8
 
-        self.add_code("(JP, {})".format(function_symbol.address))
+        if function_symbol.name == "output":
+            t3 = self.st.get_temp()
+            self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t3))
+            self.add_code("(ADD, {}, #{}, {})".format(t3, -SymbolTable.STACK_BLOCK_SIZE, t3))
+            self.add_code("(PRINT, @{})".format(t3))
+        else:
+            self.add_code("(JP, {})".format(function_symbol.address))
 
         ret_value = self.st.get_temp()
         self.add_code("(ASSIGN, {}, {})".format(SymbolTable.RETURN_VALUE,
@@ -164,12 +170,17 @@ class SemanticActions:
                                                  SymbolTable.STACK_BASE))
         self.st.start_new_scope("normal")
 
+        self.st.add_symbol("output", "void")
+        self.st.symbol_table[-1]["output"].is_function = True
+        self.st.symbol_table[-1]["output"].n_args = 1
+        self.st.symbol_table[-1]["output"].address = 0
+        self.st.symbol_table[-1]["output"].args.append("int")
+
+
     def pid(self, ct):
         id_name = ct.value
         symbol = self.st.resolve_symbol(id_name)
         if not symbol:
-            if symbol == "output":
-                pass
             print_semantic_error("ID {} is not defined".format(id_name))
             return
 
@@ -719,10 +730,9 @@ class Parser:
 
             "Var-call-prime": TransitionDFA({
                 1: {("Var-prime", False): (-1, [], []),
-                    ("(", True): (2, [self.sa.push_arg_counter, self.sa.inc_stack_pointer], [])},
+                    ("(", True): (2, [self.sa.push_arg_counter], [])},
                 2: {("Args", False): (3, [], [])},
-                3: {(")", True): (
-                    -1, [self.sa.push_func_stuff, self.sa.pop_arg_counter, self.sa.dec_stack_pointer], [])},
+                3: {(")", True): (-1, [self.sa.inc_stack_pointer, self.sa.push_func_stuff, self.sa.pop_arg_counter, self.sa.dec_stack_pointer], [])},
             }),
 
             "Var-prime": TransitionDFA({
@@ -734,10 +744,10 @@ class Parser:
 
             "Factor-prime": TransitionDFA({
                 1: {("Epsilon", True): (-1, [], []),
-                    ("(", True): (2, [self.sa.push_arg_counter, self.sa.inc_stack_pointer], [])},
+                    ("(", True): (2, [self.sa.push_arg_counter], [])},
                 2: {("Args", False): (3, [], [])},
                 3: {(")", True): (
-                    -1, [self.sa.push_func_stuff, self.sa.pop_arg_counter, self.sa.dec_stack_pointer], [])},
+                    -1, [self.sa.inc_stack_pointer, self.sa.push_func_stuff, self.sa.pop_arg_counter, self.sa.dec_stack_pointer], [])},
             }),
 
             "Factor-zegond": TransitionDFA({
