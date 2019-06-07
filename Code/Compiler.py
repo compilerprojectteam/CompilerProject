@@ -908,4 +908,4 @@ if __name__ == "__main__":
         f.close()
 
     os.chdir("../out/")
-    os.system("tester.exe")
+    os.system("tester.exe 2> nul")

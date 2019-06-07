@@ -1,11 +1,24 @@
-int f(int g, int h){
-    output(g);
-    output(h);
+int a[10];
+
+int f(){
+    int b;
+    int g(){
+        int c;
+        int h(int d){
+            c = 2;
+            b = d;
+        }
+        h(7);
+        output(b);
+        output(c);
+        b = 10;
+    }
+    b = 5;
+    output(b);
+    g();
+    output(b);
 }
 
 void main(void) {
-    int g[8];
-    g[0] = 2;
-    g[1] = 5;
-    f(g[0], g[1]);
+    f();
 }
