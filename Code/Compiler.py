@@ -31,9 +31,10 @@ class SemanticActions:
         self.stack.append(t)
         self.stack_flags.append(flag)
 
-    def poop(self):
-        s = self.stack.pop()
-        f = self.stack_flags.pop()
+    def poop(self, count=1):
+        for j in range(count):
+            s = self.stack.pop()
+            f = self.stack_flags.pop()
         return s, f
 
     def add_code(self, code):
@@ -43,10 +44,84 @@ class SemanticActions:
     def pop_stack(self, ct):
         self.poop()
 
-    def save(self, ct):
+    def backpatch_if(self, ct):
+        exp, exp_type = self.stack[-3], self.stack_flags[-3]
+        backpatch = self.stack[-2]
+        self.code_block[backpatch] = "(JPF, {}{}, {})".format(
+            "@" if "indirect" in exp_type else "",
+            exp,
+            self.i
+        )
+
+    def backpatch_else(self, ct):
+        backpatch = self.stack[-1]
+        self.code_block[backpatch] = "(JP, {})".format(self.i)
+        self.poop(3)
+
+    def add_expressions(self, ct):
+        exp2, exp2_type = self.poop()
+        addop, _ = self.poop()
+        exp1, exp1_type = self.poop()
+        t = self.st.get_temp()
+        self.add_code("({}, {}{}, {}{}, {})".format(
+            "ADD" if addop == "+" else "SUB",
+            "@" if "indirect" in exp1_type else "",
+            exp1,
+            "@" if "indirect" in exp2_type else "",
+            exp2,
+            t
+        ))
+        self.push(t, "direct")
+
+    def relop_expressions(self, ct):
+        exp2, exp2_type = self.poop()
+        relop, _ = self.poop()
+        exp1, exp1_type = self.poop()
+        t = self.st.get_temp()
+        self.add_code("({}, {}{}, {}{}, {})".format(
+            "LT" if relop == "<" else "EQ",
+            "@" if "indirect" in exp1_type else "",
+            exp1,
+            "@" if "indirect" in exp2_type else "",
+            exp2,
+            t
+        ))
+        self.push(t, "direct")
+
+    def push_operation_type(self, ct):
+        self.push(ct.value)
+
+    def mult_expressions(self, ct):
+        exp1, exp1_type = self.poop()
+        exp2, exp2_type = self.poop()
+        t = self.st.get_temp()
+        self.add_code("(MULT, {}{}, {}{}, {})".format(
+            "@" if "indirect" in exp1_type else "",
+            exp1,
+            "@" if "indirect" in exp2_type else "",
+            exp2,
+            t
+        ))
+        self.push(t, "direct")
+
+    def negate_expression(self, ct):
+        exp, exp_type = self.poop()
+        t = self.st.get_temp()
+        self.add_code("(ASSIGN, {}{}, {})".format(
+            "@" if "indirect" in exp_type else "",
+            exp,
+            t))
+        self.add_code("(MULT, #-1, {}, {})".format(t, t))
+        self.push(t, "direct")
+
+    def save_func(self, ct):
         if self.st.last_symbol[-1].name != "main":
             self.push(self.i, "")
             self.add_code("")
+
+    def save(self, ct):
+        self.push(self.i, "")
+        self.add_code("")
 
     def push_arg(self, ct):
         t = self.st.get_temp()
@@ -143,7 +218,7 @@ class SemanticActions:
             self.add_code("(JP, {})".format(function_symbol.address))
 
         ret_value = self.st.get_temp()
-        self.add_code("(ASSIGN, {}, {})".format(SymbolTable.RETURN_VALUE,
+        self.add_code("(ASSIGN, {}, {})".format(SymbolTable.RETURN_VALUE_ADDRESS,
                                                 ret_value))
         self.push(ret_value, "")
 
@@ -165,12 +240,20 @@ class SemanticActions:
     def add_to_var(self, ct):
         exp, exp_type = self.poop()
         addr, addr_type = self.poop()
-        self.add_code("(MULT, {}, #4, {})".format(exp, exp))
-        self.add_code("(ADD, {}, {}, {})".format(addr, exp, addr))
+
+        if exp_type == "indirect":
+            t = self.st.get_temp()
+            self.add_code("(ASSIGN, @{}, {})".format(exp, t))
+            self.add_code("(MULT, {}, #4, {})".format(t, t))
+            self.add_code("(ADD, {}, {}, {})".format(addr, t, addr))
+        else:
+            self.add_code("(MULT, {}, #4, {})".format(exp, exp))
+            self.add_code("(ADD, {}, {}, {})".format(addr, exp, addr))
+
         self.push(addr, "indirect")
 
     def start(self, ct):
-        self.add_code("(ASSIGN, #0, {})".format(SymbolTable.RETURN_VALUE))
+        self.add_code("(ASSIGN, #0, {})".format(SymbolTable.RETURN_VALUE_ADDRESS))
 
         self.add_code("(ASSIGN, #{}, {})".format(SymbolTable.STACK_SEGMENT_ADDRESS,
                                                  SymbolTable.STACK_BASE))
@@ -231,16 +314,33 @@ class SemanticActions:
         self.st.last_symbol[-2].args.append("array" if self.st.last_symbol[-1].is_reference else "int")
         self.st.last_symbol[-2].n_args += 1
 
-    def return_code(self, ct):
+    def return_code(self, ct, still_in_scope=True):
+
+        if still_in_scope:
+            i = self.st.get_last_function_scope()
+            func_symbol = self.st.last_symbol[i - 1]
+        else:
+            func_symbol = self.st.last_symbol[-1]
+
+        offset = -SymbolTable.STACK_BLOCK_SIZE + func_symbol.n_args * 4
+        t = self.st.get_temp()
+        self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
+        self.add_code("(ADD, {}, #{}, {})".format(t, offset, t))
+        self.add_code("(ASSIGN, @{}, {})".format(t, t))
+        self.add_code("(JP, @{})".format(t))
+
+    def return_code_expression(self, ct, still_in_scope=True):
+        exp, exp_type = self.poop()
+        self.add_code("(ASSIGN, {}{}, {})".format("@" if "indirect" in exp_type else "",
+                                                  exp,
+                                                  SymbolTable.RETURN_VALUE_ADDRESS))
+
+        self.return_code(ct)
+
+    def backpatch_func_skip(self, ct):
         func_symbol = self.st.last_symbol[-1]
         if func_symbol.name != "main":
-            offset = -SymbolTable.STACK_BLOCK_SIZE + func_symbol.n_args * 4
-            t = self.st.get_temp()
-            self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
-            self.add_code("(ADD, {}, #{}, {})".format(t, offset, t))
-            self.add_code("(ASSIGN, @{}, {})".format(t, t))
-            self.add_code("(JP, @{})".format(t))
-            # print(self.stack, self.stack_flags)
+            self.return_code(ct, False)
             backpatch, _ = self.poop()
             self.code_block[backpatch] = ("(JP, {})".format(self.i))
 
@@ -322,7 +422,7 @@ class SymbolTable:
     STACK_SEGMENT_ADDRESS = 2000
     N_STACK_VARS = 1
     STACK_BASE = 1500
-    RETURN_VALUE = 1504
+    RETURN_VALUE_ADDRESS = 1504
     STACK_BLOCK_SIZE = 100
 
     def __init__(self):
@@ -463,7 +563,7 @@ class Parser:
             }),
 
             "Declaration-prime": TransitionDFA({
-                1: {("Fun-declaration-prime", False): (-1, [self.sa.save, self.sa.set_fun_address], []),
+                1: {("Fun-declaration-prime", False): (-1, [self.sa.save_func, self.sa.set_fun_address], []),
                     ("Var-declaration-prime", False): (-1, [self.sa.set_var_address], [])},
             }),
 
@@ -479,7 +579,8 @@ class Parser:
                 1: {("(", True): (2, [self.sa.start_function_scope], [])},
                 2: {("Params", False): (3, [], [])},
                 3: {(")", True): (4, [], [])},
-                4: {("Compound-stmt", False): (-1, [self.sa.save_stack, self.sa.save_stack], [self.sa.return_code])},
+                4: {("Compound-stmt", False): (
+                    -1, [self.sa.save_stack, self.sa.save_stack], [self.sa.backpatch_func_skip])},
             }),
 
             "Type-specifier": TransitionDFA({
@@ -557,10 +658,10 @@ class Parser:
                 1: {("if", True): (2, [], [])},
                 2: {("(", True): (3, [], [])},
                 3: {("Expression", False): (4, [], [])},
-                4: {(")", True): (5, [], [])},
+                4: {(")", True): (5, [], [self.sa.save])},
                 5: {("Statement", False): (6, [], [])},
-                6: {("else", True): (7, [], [])},
-                7: {("Statement", False): (-1, [], [])},
+                6: {("else", True): (7, [self.sa.save, self.sa.backpatch_if], [])},
+                7: {("Statement", False): (-1, [], [self.sa.backpatch_else])},
             }),
 
             "Iteration-stmt": TransitionDFA({
@@ -577,9 +678,9 @@ class Parser:
             }),
 
             "Return-stmt-prime": TransitionDFA({
-                1: {(";", True): (-1, [], []),
+                1: {(";", True): (-1, [self.sa.return_code], []),
                     ("Expression", False): (2, [], [])},
-                2: {(";", True): (-1, [], [])}
+                2: {(";", True): (-1, [self.sa.return_code_expression], [])}
             }),
 
             "Switch-stmt": TransitionDFA({
@@ -651,17 +752,17 @@ class Parser:
             "C": TransitionDFA({
                 1: {("Relop", False): (2, [], []),
                     ("Epsilon", True): (-1, [], [])},
-                2: {("Additive-expression", False): (-1, [], [])}
+                2: {("Additive-expression", False): (-1, [], [self.sa.relop_expressions])}
             }),
 
             "Relop": TransitionDFA({
-                1: {("==", True): (-1, [], []),
-                    ("<", True): (-1, [], [])},
+                1: {("==", True): (-1, [self.sa.push_operation_type], []),
+                    ("<", True): (-1, [self.sa.push_operation_type], [])},
             }),
 
             "Addop": TransitionDFA({
-                1: {("+", True): (-1, [], []),
-                    ("-", True): (-1, [], [])},
+                1: {("+", True): (-1, [self.sa.push_operation_type], []),
+                    ("-", True): (-1, [self.sa.push_operation_type], [])},
             }),
 
             "Additive-expression": TransitionDFA({
@@ -682,7 +783,7 @@ class Parser:
             "D": TransitionDFA({
                 1: {("Addop", False): (2, [], []),
                     ("Epsilon", True): (-1, [], [])},
-                2: {("Term", False): (3, [], [])},
+                2: {("Term", False): (3, [], [self.sa.add_expressions])},
                 3: {("D", False): (-1, [], [])}
             }),
 
@@ -704,7 +805,7 @@ class Parser:
             "G": TransitionDFA({
                 1: {("*", True): (2, [], []),
                     ("Epsilon", True): (-1, [], [])},
-                2: {("Signed-factor", False): (3, [], [])},
+                2: {("Signed-factor", False): (3, [], [self.sa.mult_expressions])},
                 3: {("G", False): (-1, [], [])}
             }),
 
@@ -713,7 +814,7 @@ class Parser:
                     ("-", True): (3, [], []),
                     ("Factor", False): (-1, [], [])},
                 2: {("Factor", False): (-1, [], [])},
-                3: {("Factor", False): (-1, [], [])}
+                3: {("Factor", False): (-1, [], [self.sa.negate_expression])}
             }),
 
             "Signed-factor-prime": TransitionDFA({
@@ -725,12 +826,12 @@ class Parser:
                     ("-", True): (3, [], []),
                     ("Factor-zegond", False): (-1, [], [])},
                 2: {("Factor", False): (-1, [], [])},
-                3: {("Factor", False): (-1, [], [])}
+                3: {("Factor", False): (-1, [], [self.sa.negate_expression])}
             }),
 
             "Factor": TransitionDFA({
                 1: {("(", True): (2, [], []),
-                    ("NUM", True): (-1, [], []),
+                    ("NUM", True): (-1, [self.sa.save_to_temp], []),
                     ("ID", True): (3, [self.sa.pid], [])},
                 2: {("Expression", False): (4, [], [])},
                 3: {("Var-call-prime", False): (-1, [], [])},
@@ -741,7 +842,8 @@ class Parser:
                 1: {("Var-prime", False): (-1, [], []),
                     ("(", True): (2, [self.sa.push_arg_counter], [])},
                 2: {("Args", False): (3, [], [])},
-                3: {(")", True): (-1, [self.sa.inc_stack_pointer, self.sa.push_func_stuff, self.sa.pop_arg_counter, self.sa.dec_stack_pointer], [])},
+                3: {(")", True): (-1, [self.sa.inc_stack_pointer, self.sa.push_func_stuff, self.sa.pop_arg_counter,
+                                       self.sa.dec_stack_pointer], [])},
             }),
 
             "Var-prime": TransitionDFA({
@@ -756,7 +858,8 @@ class Parser:
                     ("(", True): (2, [self.sa.push_arg_counter], [])},
                 2: {("Args", False): (3, [], [])},
                 3: {(")", True): (
-                    -1, [self.sa.inc_stack_pointer, self.sa.push_func_stuff, self.sa.pop_arg_counter, self.sa.dec_stack_pointer], [])},
+                    -1, [self.sa.inc_stack_pointer, self.sa.push_func_stuff, self.sa.pop_arg_counter,
+                         self.sa.dec_stack_pointer], [])},
             }),
 
             "Factor-zegond": TransitionDFA({
@@ -914,4 +1017,4 @@ if __name__ == "__main__":
         f.close()
 
     os.chdir("../out/")
-    os.system("tester.exe 2> nul")
+    os.system("tester.exe")
