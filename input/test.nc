@@ -1,24 +1,17 @@
 int a[10];
 
-int f(){
-    int b;
-    int g(){
-        int c;
-        int h(int d){
-            c = 2;
-            b = d;
-        }
-        h(7);
-        output(b);
-        output(c);
-        b = 10;
-    }
-    b = 5;
-    output(b);
-    g();
-    output(b);
+int h(int g[]){
+    g[3] = (2);
+}
+
+int f(int g[]){
+    g[5] = 4;
+    h(g);
 }
 
 void main(void) {
-    f();
+    int b[10];
+    f(b);
+    output(b[5]);
+    output(b[3]);
 }

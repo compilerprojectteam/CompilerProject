@@ -53,7 +53,13 @@ class SemanticActions:
         self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
         self.add_code("(ADD, {}, #{}, {})".format(t, SymbolTable.STACK_BLOCK_SIZE + self.arg_counter[-1], t))
         exp, exp_type = self.poop()
-        self.add_code("(ASSIGN, {}{}, @{})".format("@" if exp_type == "indirect" else "",
+
+        if "array" in exp_type:
+            type_specifier = ""
+        else:
+            type_specifier = "@" if "indirect" in exp_type else ""
+
+        self.add_code("(ASSIGN, {}{}, @{})".format(type_specifier,
                                                    exp,
                                                    t))
         self.arg_counter[-1] += 4
@@ -145,9 +151,9 @@ class SemanticActions:
         rhs, rhs_type = self.poop()
         lhs, lhs_type = self.poop()
 
-        self.add_code("(ASSIGN, {}{}, {}{})".format("@" if rhs_type == "indirect" else "",
+        self.add_code("(ASSIGN, {}{}, {}{})".format("@" if "indirect" in rhs_type else "",
                                                     rhs,
-                                                    "@" if lhs_type == "indirect" else "",
+                                                    "@" if "indirect" in lhs_type else "",
                                                     lhs))
         self.push(lhs, lhs_type)
 
@@ -176,7 +182,6 @@ class SemanticActions:
         self.st.symbol_table[-1]["output"].address = 0
         self.st.symbol_table[-1]["output"].args.append("int")
 
-
     def pid(self, ct):
         id_name = ct.value
         symbol = self.st.resolve_symbol(id_name)
@@ -184,7 +189,6 @@ class SemanticActions:
             print_semantic_error("ID {} is not defined".format(id_name))
             return
 
-        self.code_block.append(id_name)
         if symbol.is_function:
             self.push(symbol.address, "function")
             self.push(symbol, "symbol")
@@ -193,7 +197,7 @@ class SemanticActions:
             if symbol.is_array:
                 t = self.st.get_temp()
                 self.add_code("(ASSIGN, #{}, {})".format(symbol.address, t))
-                self.push(t, "direct")
+                self.push(t, "direct array")
             else:
                 self.push(symbol.address, "direct")
         else:
@@ -205,7 +209,12 @@ class SemanticActions:
                     self.add_code("(ADD, {}, #{}, {})".format(t, symbol.address, t))
                     if symbol.is_reference:
                         self.add_code("(ASSIGN, @{}, {})".format(t, t))
-                    self.push(t, "indirect")
+
+                    if symbol.is_array:
+                        self.push(t, "indirect array")
+                    else:
+                        self.push(t, "indirect")
+
                     break
                 if self.st.scope_type[i] == "function":
                     function_symbol = self.st.last_symbol[i - 1]
@@ -899,12 +908,9 @@ if __name__ == "__main__":
     with open("../out/output.txt", mode='w') as f:
         i = 0
         for line in p.sa.code_block:
-            if line.startswith("("):
-                f.write("{}\t{}\n".format(i, line))
-                print("{}\t{}".format(i, line))
-                i += 1
-            else:
-                print(line)
+            f.write("{}\t{}\n".format(i, line))
+            print("{}\t{}".format(i, line))
+            i += 1
         f.close()
 
     os.chdir("../out/")
