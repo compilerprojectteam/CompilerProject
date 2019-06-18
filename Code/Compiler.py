@@ -27,6 +27,16 @@ class SemanticActions:
         self.code_block = []
         self.arg_counter = []
 
+    def get_temp(self):
+        temp = 500
+        temps_in_stack = [var for var, var_type in
+                          zip(self.stack, self.stack_flags)
+                          if "temp" in var_type]
+        while True:
+            if temp not in temps_in_stack:
+                return temp
+            temp += 4
+
     def push(self, t, flag=""):
         self.stack.append(t)
         self.stack_flags.append(flag)
@@ -43,6 +53,12 @@ class SemanticActions:
 
     def pop_stack(self, ct):
         self.poop()
+
+    def start_switch_scope(self, ct):
+        self.st.start_new_scope("switch")
+
+    def start_iteration_scope(self, ct):
+        self.st.start_new_scope("iteration")
 
     def backpatch_if(self, ct):
         exp, exp_type = self.stack[-3], self.stack_flags[-3]
@@ -62,7 +78,7 @@ class SemanticActions:
         exp2, exp2_type = self.poop()
         addop, _ = self.poop()
         exp1, exp1_type = self.poop()
-        t = self.st.get_temp()
+        t = self.get_temp()
         self.add_code("({}, {}{}, {}{}, {})".format(
             "ADD" if addop == "+" else "SUB",
             "@" if "indirect" in exp1_type else "",
@@ -71,13 +87,13 @@ class SemanticActions:
             exp2,
             t
         ))
-        self.push(t, "direct")
+        self.push(t, "direct temp")
 
     def relop_expressions(self, ct):
         exp2, exp2_type = self.poop()
         relop, _ = self.poop()
         exp1, exp1_type = self.poop()
-        t = self.st.get_temp()
+        t = self.get_temp()
         self.add_code("({}, {}{}, {}{}, {})".format(
             "LT" if relop == "<" else "EQ",
             "@" if "indirect" in exp1_type else "",
@@ -86,7 +102,7 @@ class SemanticActions:
             exp2,
             t
         ))
-        self.push(t, "direct")
+        self.push(t, "direct temp")
 
     def push_operation_type(self, ct):
         self.push(ct.value)
@@ -94,7 +110,7 @@ class SemanticActions:
     def mult_expressions(self, ct):
         exp1, exp1_type = self.poop()
         exp2, exp2_type = self.poop()
-        t = self.st.get_temp()
+        t = self.get_temp()
         self.add_code("(MULT, {}{}, {}{}, {})".format(
             "@" if "indirect" in exp1_type else "",
             exp1,
@@ -102,17 +118,17 @@ class SemanticActions:
             exp2,
             t
         ))
-        self.push(t, "direct")
+        self.push(t, "direct temp")
 
     def negate_expression(self, ct):
         exp, exp_type = self.poop()
-        t = self.st.get_temp()
+        t = self.get_temp()
         self.add_code("(ASSIGN, {}{}, {})".format(
             "@" if "indirect" in exp_type else "",
             exp,
             t))
         self.add_code("(MULT, #-1, {}, {})".format(t, t))
-        self.push(t, "direct")
+        self.push(t, "direct temp")
 
     def save_func(self, ct):
         if self.st.last_symbol[-1].name != "main":
@@ -124,7 +140,7 @@ class SemanticActions:
         self.add_code("")
 
     def push_arg(self, ct):
-        t = self.st.get_temp()
+        t = self.get_temp()
         self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
         self.add_code("(ADD, {}, #{}, {})".format(t, SymbolTable.STACK_BLOCK_SIZE + self.arg_counter[-1], t))
         exp, exp_type = self.poop()
@@ -152,11 +168,31 @@ class SemanticActions:
     def push_arg_counter(self, ct):
         self.arg_counter.append(-SymbolTable.STACK_BLOCK_SIZE)
 
+    def push_temp_vars(self, ct):
+        base = self.st.STACK_BLOCK_SIZE // 2
+        for var, var_type in zip(self.stack, self.stack_flags):
+            if "temp" in var_type:
+                t = self.get_temp()
+                self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
+                self.add_code("(SUB, {}, #{}, {})".format(t, base, t))
+                self.add_code("(ASSIGN, {}, @{})".format(var, t))
+                base += 4
+
+    def poop_temp_vars(self, ct):
+        base = self.st.STACK_BLOCK_SIZE // 2
+        for var, var_type in zip(self.stack[:-1], self.stack_flags[:-1]):
+            if "temp" in var_type:
+                t = self.get_temp()
+                self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
+                self.add_code("(SUB, {}, #{}, {})".format(t, base, t))
+                self.add_code("(ASSIGN, @{}, {})".format(t, var))
+                base += 4
+
     def pop_arg_counter(self, ct):
         self.arg_counter.pop()
 
     def push_func_stuff(self, ct):
-        t = self.st.get_temp()
+        t = self.get_temp()
         self.arg_counter[-1] += 4
 
         function_symbol, _ = self.poop()
@@ -172,13 +208,13 @@ class SemanticActions:
             if func_being_declared == parent_func:
                 self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
                 self.add_code("(ADD, {}, #{}, {})".format(t, self.arg_counter[-1], t))
-                t2 = self.st.get_temp()
+                t2 = self.get_temp()
                 self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t2))
                 self.add_code("(SUB, {}, #{}, {})".format(t2, 100, t2))
                 self.add_code("(ASSIGN, {}, @{})".format(t2, t))
 
             else:
-                current_temp = self.st.get_temp()
+                current_temp = self.get_temp()
                 parent_q_offset = 4 * (func_being_declared.n_args + SymbolTable.N_STACK_VARS)
                 self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, current_temp))
                 self.add_code("(ADD, {}, #{}, {})".format(current_temp,
@@ -209,18 +245,20 @@ class SemanticActions:
         self.add_code("(ASSIGN, #{}, @{})".format(self.i + 2, t))
         self.arg_counter[-1] += 8
 
+        print(self.stack)
+
         if function_symbol.name == "output":
-            t3 = self.st.get_temp()
+            t3 = self.get_temp()
             self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t3))
             self.add_code("(ADD, {}, #{}, {})".format(t3, -SymbolTable.STACK_BLOCK_SIZE, t3))
             self.add_code("(PRINT, @{})".format(t3))
         else:
             self.add_code("(JP, {})".format(function_symbol.address))
 
-        ret_value = self.st.get_temp()
+        ret_value = self.get_temp()
         self.add_code("(ASSIGN, {}, {})".format(SymbolTable.RETURN_VALUE_ADDRESS,
                                                 ret_value))
-        self.push(ret_value, "")
+        self.push(ret_value, "temp")
 
     def assign(self, ct):
         rhs, rhs_type = self.poop()
@@ -233,16 +271,16 @@ class SemanticActions:
         self.push(lhs, lhs_type)
 
     def save_to_temp(self, ct):
-        t = self.st.get_temp()
+        t = self.get_temp()
         self.add_code("(ASSIGN, #{}, {})".format(int(ct.value), t))
-        self.push(t, "direct")
+        self.push(t, "direct temp")
 
     def add_to_var(self, ct):
         exp, exp_type = self.poop()
         addr, addr_type = self.poop()
 
         if exp_type == "indirect":
-            t = self.st.get_temp()
+            t = self.get_temp()
             self.add_code("(ASSIGN, @{}, {})".format(exp, t))
             self.add_code("(MULT, {}, #4, {})".format(t, t))
             self.add_code("(ADD, {}, {}, {})".format(addr, t, addr))
@@ -250,7 +288,7 @@ class SemanticActions:
             self.add_code("(MULT, {}, #4, {})".format(exp, exp))
             self.add_code("(ADD, {}, {}, {})".format(addr, exp, addr))
 
-        self.push(addr, "indirect")
+        self.push(addr, "indirect temp")
 
     def start(self, ct):
         self.add_code("(ASSIGN, #0, {})".format(SymbolTable.RETURN_VALUE_ADDRESS))
@@ -278,14 +316,14 @@ class SemanticActions:
 
         elif symbol.location == "heap":
             if symbol.is_array:
-                t = self.st.get_temp()
+                t = self.get_temp()
                 self.add_code("(ASSIGN, #{}, {})".format(symbol.address, t))
-                self.push(t, "direct array")
+                self.push(t, "indirect array temp")
             else:
                 self.push(symbol.address, "direct")
         else:
             pointer = SymbolTable.STACK_BASE
-            t = self.st.get_temp()
+            t = self.get_temp()
             self.add_code("(ASSIGN, {}, {})".format(pointer, t))
             for i in range(len(self.st.symbol_table))[::-1]:
                 if id_name in self.st.symbol_table[i]:
@@ -294,9 +332,9 @@ class SemanticActions:
                         self.add_code("(ASSIGN, @{}, {})".format(t, t))
 
                     if symbol.is_array:
-                        self.push(t, "indirect array")
+                        self.push(t, "indirect array temp")
                     else:
-                        self.push(t, "indirect")
+                        self.push(t, "indirect temp")
 
                     break
                 if self.st.scope_type[i] == "function":
@@ -323,7 +361,7 @@ class SemanticActions:
             func_symbol = self.st.last_symbol[-1]
 
         offset = -SymbolTable.STACK_BLOCK_SIZE + func_symbol.n_args * 4
-        t = self.st.get_temp()
+        t = self.get_temp()
         self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
         self.add_code("(ADD, {}, #{}, {})".format(t, offset, t))
         self.add_code("(ASSIGN, @{}, {})".format(t, t))
@@ -339,6 +377,7 @@ class SemanticActions:
 
     def backpatch_func_skip(self, ct):
         func_symbol = self.st.last_symbol[-1]
+        print_symbol(func_symbol)
         if func_symbol.name != "main":
             self.return_code(ct, False)
             backpatch, _ = self.poop()
@@ -400,6 +439,37 @@ class SemanticActions:
         else:
             self.st.heap_pointer += 4 * int(ct.value)
 
+    def save_jump_temp(self, ct):
+        self.save(ct)
+        t = self.get_temp()
+        self.push(t, "while end temp")
+
+    def label(self, ct):
+        self.push(self.i, "while expression")
+
+    def backpatch_while_condition(self, ct):
+        print(self.stack)
+        print(self.stack_flags)
+        i, _ = self.poop()
+        exp, exp_type = self.poop()
+        self.code_block[i] = "(JPF, {}{}, {})".format(
+            "@" if "indirect" in exp_type else "",
+            exp,
+            self.i
+        )
+        temp, _ = self.poop(2)  # remove while begin
+        i, _ = self.poop()
+        self.code_block[i] = "(ASSIGN, #{}, {})".format(self.i, temp)
+
+    def jmp_to_beginning(self, ct):
+        i = self.stack[-3]
+        self.add_code("(JP, {})".format(i))
+
+    def jump_indirect_to_temp(self, ct):
+        self.st.get_last_abnormal_nonfuctional_scope()
+        temp = self.stack[-4]
+        self.add_code("(JP, @{})".format(temp))
+
 
 class Symbol:
     def __init__(self, name, ttype="int", address=-1):
@@ -423,7 +493,7 @@ class SymbolTable:
     N_STACK_VARS = 1
     STACK_BASE = 1500
     RETURN_VALUE_ADDRESS = 1504
-    STACK_BLOCK_SIZE = 100
+    STACK_BLOCK_SIZE = 200
 
     def __init__(self):
         self.symbol_table = []
@@ -433,11 +503,6 @@ class SymbolTable:
         self.stack_pointer = []
 
         self.heap_pointer = 1000
-        self.temp_pointer = 496
-
-    def get_temp(self):
-        self.temp_pointer += 4
-        return self.temp_pointer
 
     def start_new_scope(self, stype):
         self.last_symbol.append(None)
@@ -485,6 +550,11 @@ class SymbolTable:
 
     def get_current_memory_type(self):
         return "stack" if len(self.symbol_table) > 1 else "heap"
+
+    def get_last_abnormal_nonfuctional_scope(self):
+        for stype in self.scope_type[::-1]:
+            if stype in ['iteration', 'switch']:
+                return stype
 
 
 def error(message):
@@ -580,7 +650,7 @@ class Parser:
                 2: {("Params", False): (3, [], [])},
                 3: {(")", True): (4, [], [])},
                 4: {("Compound-stmt", False): (
-                    -1, [self.sa.save_stack, self.sa.save_stack], [self.sa.backpatch_func_skip])},
+                    -1, [self.sa.save_stack, self.sa.save_stack], [self.sa.backpatch_func_skip, self.sa.close_scope])},
             }),
 
             "Type-specifier": TransitionDFA({
@@ -639,15 +709,15 @@ class Parser:
                 1: {("Expression-stmt", False): (-1, [], []),
                     ("Compound-stmt", False): (-1, [self.sa.start_normal_scope], []),
                     ("Selection-stmt", False): (-1, [], []),
-                    ("Iteration-stmt", False): (-1, [], []),
+                    ("Iteration-stmt", False): (-1, [self.sa.start_iteration_scope], []),
                     ("Return-stmt", False): (-1, [], []),
-                    ("Switch-stmt", False): (-1, [], [])}
+                    ("Switch-stmt", False): (-1, [self.sa.start_switch_scope], [])}
             }),
 
             "Expression-stmt": TransitionDFA({
                 1: {("Expression", False): (2, [], []),
-                    ("continue", True): (3, [], []),
-                    ("break", True): (4, [], []),
+                    ("continue", True): (3, [self.sa.jmp_to_beginning], []),
+                    ("break", True): (4, [self.sa.jump_indirect_to_temp], []),
                     (";", True): (-1, [], [])},
                 2: {(";", True): (-1, [self.sa.pop_stack], [])},
                 3: {(";", True): (-1, [], [])},
@@ -665,11 +735,11 @@ class Parser:
             }),
 
             "Iteration-stmt": TransitionDFA({
-                1: {("while", True): (2, [], [])},
+                1: {("while", True): (2, [self.sa.save_jump_temp], [self.sa.label])},
                 2: {("(", True): (3, [], [])},
                 3: {("Expression", False): (4, [], [])},
-                4: {(")", True): (5, [], [])},
-                5: {("Statement", False): (-1, [], [])},
+                4: {(")", True): (5, [], [self.sa.save])},
+                5: {("Statement", False): (-1, [], [self.sa.backpatch_while_condition])},
             }),
 
             "Return-stmt": TransitionDFA({
@@ -840,10 +910,10 @@ class Parser:
 
             "Var-call-prime": TransitionDFA({
                 1: {("Var-prime", False): (-1, [], []),
-                    ("(", True): (2, [self.sa.push_arg_counter], [])},
+                    ("(", True): (2, [self.sa.push_arg_counter, self.sa.push_temp_vars], [])},
                 2: {("Args", False): (3, [], [])},
                 3: {(")", True): (-1, [self.sa.inc_stack_pointer, self.sa.push_func_stuff, self.sa.pop_arg_counter,
-                                       self.sa.dec_stack_pointer], [])},
+                                       self.sa.dec_stack_pointer], [self.sa.poop_temp_vars])},
             }),
 
             "Var-prime": TransitionDFA({
@@ -855,11 +925,11 @@ class Parser:
 
             "Factor-prime": TransitionDFA({
                 1: {("Epsilon", True): (-1, [], []),
-                    ("(", True): (2, [self.sa.push_arg_counter], [])},
+                    ("(", True): (2, [self.sa.push_arg_counter, self.sa.push_temp_vars], [])},
                 2: {("Args", False): (3, [], [])},
                 3: {(")", True): (
                     -1, [self.sa.inc_stack_pointer, self.sa.push_func_stuff, self.sa.pop_arg_counter,
-                         self.sa.dec_stack_pointer], [])},
+                         self.sa.dec_stack_pointer], [self.sa.poop_temp_vars])},
             }),
 
             "Factor-zegond": TransitionDFA({
@@ -1017,4 +1087,4 @@ if __name__ == "__main__":
         f.close()
 
     os.chdir("../out/")
-    os.system("tester.exe")
+    os.system("tester.exe 2> nul")

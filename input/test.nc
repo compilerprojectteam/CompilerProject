@@ -1,14 +1,10 @@
-int a[10];
+int a;
 
-int f(int a) {
-    if (a == 1) {
-        return 1;
-    } else {
-//        return f(a - 1) * a;
-        return a * f(a - 1);
-    }
+int f() {
+    int b;
 }
 
-void main(void) {
-    output(f(4));
+int main() {
+    int i = 0;
+
 }

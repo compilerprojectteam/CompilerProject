@@ -25,19 +25,19 @@ Statement-list -> ε
 Statement -> Expression-stmt
 Statement -> #start_normal_scope Compound-stmt
 Statement -> Selection-stmt
-Statement -> Iteration-stmt
+Statement -> #start_iteration_scope Iteration-stmt
 Statement -> Return-stmt
-Statement -> Switch-stmt
+Statement -> #start_switch_scope Switch-stmt
 Expression-stmt -> Expression ; #pop_stack
-Expression-stmt -> continue ;
-Expression-stmt -> break ;
+Expression-stmt -> continue #jmp_to_beginning;
+Expression-stmt -> break #jump_indirect_to_temp;
 Expression-stmt -> ;
 Selection-stmt -> if ( Expression ) #save Statement #save #backpatch_if else Statement #backpatch_else
-Iteration-stmt -> while ( Expression ) Statement
+Iteration-stmt -> #save_jump_temp while #label ( Expression ) #save Statement #backpatch_while_condition #close_scope
 Return-stmt -> return Return-stmt-prime
 Return-stmt-prime -> #return_code ;
 Return-stmt-prime -> Expression #return_code_expression ;
-Switch-stmt -> switch ( Expression ) { Case-stmts Default-stmt }
+Switch-stmt -> #save_jump_temp switch ( Expression ) { Case-stmts Default-stmt }
 Case-stmts -> Case-stmt Case-stmts
 Case-stmts -> ε
 Case-stmt -> case num : Statement-list
@@ -92,11 +92,11 @@ Factor -> #save_to_temp num
 Factor -> #pid id Var-call-prime
 
 Var-call-prime -> Var-prime
-Var-call-prime -> #push_arg_counter ( Args #inc_stack_pointer #push_func_stuff #pop_arg_counter #dec_stack_pointer)
+Var-call-prime -> #push_arg_counter #push_temp_vars ( Args #inc_stack_pointer #push_func_stuff #pop_arg_counter #dec_stack_pointer) #poop_temp_vars
 Var-prime -> [ Expression #add_to_var ]
 Var-prime -> ε
 
-Factor-prime -> #push_arg_counter ( Args #inc_stack_pointer #push_func_stuff #pop_arg_counter #dec_stack_pointer)
+Factor-prime -> #push_arg_counter #push_temp_vars ( Args #inc_stack_pointer #push_func_stuff #pop_arg_counter #dec_stack_pointer) # poop_temp_vars
 Factor-prime -> ε
 
 
