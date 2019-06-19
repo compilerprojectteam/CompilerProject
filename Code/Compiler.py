@@ -1,7 +1,9 @@
+import os
+import sys
+from anytree import Node, RenderTree
+
 from Code.Utils import *
 from Code.Scanner import *
-from anytree import Node, RenderTree
-import os
 
 parser_errors = None
 scanner_output = None
@@ -232,7 +234,7 @@ class SemanticActions:
                     else:
                         self.add_code("(ASSIGN, @{}, {})".format(current_temp, current_temp))
                         parent_q_offset = -SymbolTable.STACK_BLOCK_SIZE + 4 * (
-                            current_func.parent_func.n_args + SymbolTable.N_STACK_VARS)
+                                current_func.parent_func.n_args + SymbolTable.N_STACK_VARS)
                         self.add_code("(ADD, {}, #{}, {})".format(current_temp, parent_q_offset, current_temp))
 
                 self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
@@ -245,7 +247,7 @@ class SemanticActions:
         self.add_code("(ASSIGN, #{}, @{})".format(self.i + 2, t))
         self.arg_counter[-1] += 8
 
-        print(self.stack)
+        # print(self.stack)
 
         if function_symbol.name == "output":
             t3 = self.get_temp()
@@ -449,8 +451,8 @@ class SemanticActions:
         self.push(self.i, "while expression")
 
     def backpatch_while_condition(self, ct):
-        print(self.stack)
-        print(self.stack_flags)
+        # print(self.stack)
+        # print(self.stack_flags)
         i, _ = self.poop()
         exp, exp_type = self.poop()
         self.code_block[i] = "(JPF, {}{}, {})".format(
@@ -1078,7 +1080,7 @@ if __name__ == "__main__":
     p = Parser("../input/test.nc")
 
     p.parse()
-    print(p.st.symbol_table)
+    # print(p.st.symbol_table)
     # print("\n".join(p.sa.code_block))
 
     with open("../out/output.txt", mode='w') as f:
@@ -1090,5 +1092,9 @@ if __name__ == "__main__":
         f.close()
 
     os.chdir("../out/")
-    os.system("tester.exe 2> nul")
+
+    if sys.platform == "linux":
+        os.system("./tester.out 2> nul")
+    else:
+        os.system("tester.exe 2> nul")
     # os.system("tester.exe")
