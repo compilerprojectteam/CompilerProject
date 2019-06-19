@@ -377,7 +377,7 @@ class SemanticActions:
 
     def backpatch_func_skip(self, ct):
         func_symbol = self.st.last_symbol[-1]
-        print_symbol(func_symbol)
+        # print_symbol(func_symbol)
         if func_symbol.name != "main":
             self.return_code(ct, False)
             backpatch, _ = self.poop()
@@ -455,10 +455,12 @@ class SemanticActions:
         self.code_block[i] = "(JPF, {}{}, {})".format(
             "@" if "indirect" in exp_type else "",
             exp,
-            self.i
+            self.i + 1
         )
-        temp, _ = self.poop(2)  # remove while begin
+        label, _ = self.poop()
+        temp, _ = self.poop()
         i, _ = self.poop()
+        self.add_code("(JP, {})".format(label))
         self.code_block[i] = "(ASSIGN, #{}, {})".format(self.i, temp)
 
     def jmp_to_beginning(self, ct):
@@ -514,8 +516,8 @@ class SymbolTable:
             self.last_symbol[-2].is_function = True
 
     def remove_last_scope(self):
-        print_symbol_table(self)
-        print("_" * 100)
+        # print_symbol_table(self)
+        # print("_" * 100)
         self.symbol_table.pop()
         self.last_symbol.pop()
         self.stack_pointer.pop()
@@ -650,7 +652,7 @@ class Parser:
                 2: {("Params", False): (3, [], [])},
                 3: {(")", True): (4, [], [])},
                 4: {("Compound-stmt", False): (
-                    -1, [self.sa.save_stack, self.sa.save_stack], [self.sa.backpatch_func_skip, self.sa.close_scope])},
+                    -1, [self.sa.save_stack, self.sa.save_stack], [self.sa.backpatch_func_skip])},
             }),
 
             "Type-specifier": TransitionDFA({
@@ -739,7 +741,7 @@ class Parser:
                 2: {("(", True): (3, [], [])},
                 3: {("Expression", False): (4, [], [])},
                 4: {(")", True): (5, [], [self.sa.save])},
-                5: {("Statement", False): (-1, [], [self.sa.backpatch_while_condition])},
+                5: {("Statement", False): (-1, [], [self.sa.backpatch_while_condition, self.sa.close_scope])},
             }),
 
             "Return-stmt": TransitionDFA({
@@ -1088,3 +1090,4 @@ if __name__ == "__main__":
 
     os.chdir("../out/")
     os.system("tester.exe 2> nul")
+    # os.system("tester.exe")
