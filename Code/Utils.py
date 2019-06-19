@@ -19,6 +19,7 @@ def print_symbol_table(symbol_table):
 
 def print_semantic_error(error):
     print(error)
+    exit()
 
 if __name__ == "__main__":
     for i in range(5)[::-1]:

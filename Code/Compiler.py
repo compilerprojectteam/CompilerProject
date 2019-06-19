@@ -1156,7 +1156,7 @@ if __name__ == "__main__":
     os.chdir("../out/")
 
     if sys.platform == "linux":
-        os.system("./tester.out 2> nul.txt")
+        os.system("./tester.out 2> /dev/null")
     else:
-        os.system("tester.exe 2> nul.txt")
+        os.system("tester.exe 2> nul")
     # os.system("tester.exe")
