@@ -75,10 +75,10 @@ class SemanticActions:
         self.poop(3)
 
     def add_expressions(self, ct):
+        t = self.get_temp()
         exp2, exp2_type = self.poop()
         addop, _ = self.poop()
         exp1, exp1_type = self.poop()
-        t = self.get_temp()
         self.add_code("({}, {}{}, {}{}, {})".format(
             "ADD" if addop == "+" else "SUB",
             "@" if "indirect" in exp1_type else "",
@@ -90,10 +90,10 @@ class SemanticActions:
         self.push(t, "direct temp")
 
     def relop_expressions(self, ct):
+        t = self.get_temp()
         exp2, exp2_type = self.poop()
         relop, _ = self.poop()
         exp1, exp1_type = self.poop()
-        t = self.get_temp()
         self.add_code("({}, {}{}, {}{}, {})".format(
             "LT" if relop == "<" else "EQ",
             "@" if "indirect" in exp1_type else "",
@@ -108,9 +108,9 @@ class SemanticActions:
         self.push(ct.value)
 
     def mult_expressions(self, ct):
+        t = self.get_temp()
         exp1, exp1_type = self.poop()
         exp2, exp2_type = self.poop()
-        t = self.get_temp()
         self.add_code("(MULT, {}{}, {}{}, {})".format(
             "@" if "indirect" in exp1_type else "",
             exp1,
@@ -121,8 +121,8 @@ class SemanticActions:
         self.push(t, "direct temp")
 
     def negate_expression(self, ct):
-        exp, exp_type = self.poop()
         t = self.get_temp()
+        exp, exp_type = self.poop()
         self.add_code("(ASSIGN, {}{}, {})".format(
             "@" if "indirect" in exp_type else "",
             exp,
