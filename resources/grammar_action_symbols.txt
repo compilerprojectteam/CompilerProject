@@ -30,7 +30,7 @@ Statement -> Return-stmt
 Statement -> #start_switch_scope Switch-stmt
 Expression-stmt -> Expression ; #pop_stack
 Expression-stmt -> continue #jmp_to_beginning;
-Expression-stmt -> break #jump_indirect_to_temp;
+Expression-stmt -> break #jump_indirect_to_temp
 Expression-stmt -> ;
 Selection-stmt -> if ( Expression ) #save Statement #save #backpatch_if else Statement #backpatch_else
 Iteration-stmt -> #save_jump_temp while #label ( Expression ) #save Statement #backpatch_while_condition #close_scope

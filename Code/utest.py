@@ -43,7 +43,7 @@ class CompilerTest(unittest.TestCase):
 
     def test_code_generation(self):
         for test_file, output_file in zip(test_files, desired_output_files):
-            with self.subTest():
+            with self.subTest(msg=test_file):
                 result = compile_and_run_tester("tests/" + test_file)
                 with open("desired_outputs/" + output_file) as o:
                     desired_output = "".join(o.readlines())

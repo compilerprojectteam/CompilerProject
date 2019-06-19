@@ -28,25 +28,45 @@ class SemanticActions:
         self.stack_flags = []
         self.code_block = []
         self.arg_counter = []
+        self.while_stack = []
+        self.while_stack_flags = []
 
     def get_temp(self):
         temp = 500
         temps_in_stack = [var for var, var_type in
                           zip(self.stack, self.stack_flags)
                           if "temp" in var_type]
+        temps_in_stack = temps_in_stack + [var for var, var_type in
+                                           zip(self.while_stack, self.while_stack_flags)
+                                           if "temp" in var_type]
         while True:
             if temp not in temps_in_stack:
                 return temp
             temp += 4
 
-    def push(self, t, flag=""):
-        self.stack.append(t)
-        self.stack_flags.append(flag)
+    def push(self, t, flag="", type="main"):
+        if type == "main":
+            self.stack.append(t)
+            self.stack_flags.append(flag)
+        elif type == "while":
+            self.while_stack.append(t)
+            self.while_stack_flags.append(flag)
+        else:
+            pass
 
-    def poop(self, count=1):
+    def poop(self, count=1, type="main"):
+        if type == "main":
+            stack = self.stack
+            stack_flags = self.stack_flags
+        elif type == "while":
+            stack = self.while_stack
+            stack_flags = self.while_stack_flags
+        else:
+            stack = None
+            stack_flags = None
         for j in range(count):
-            s = self.stack.pop()
-            f = self.stack_flags.pop()
+            s = stack.pop()
+            f = stack_flags.pop()
         return s, f
 
     def add_code(self, code):
@@ -203,8 +223,6 @@ class SemanticActions:
         parent_func = function_symbol.parent_func
 
         if parent_func:
-            q = 1
-
             func_being_declared = self.st.last_symbol[self.st.get_last_function_scope() - 1]
 
             if func_being_declared == parent_func:
@@ -226,9 +244,7 @@ class SemanticActions:
                 for i in range(len(self.st.symbol_table))[::-1]:
                     if self.st.scope_type[i] != "function":
                         continue
-
                     current_func = self.st.last_symbol[i - 1]
-
                     if current_func.parent_func == parent_func:
                         break
                     else:
@@ -246,8 +262,6 @@ class SemanticActions:
         self.add_code("(ADD, {}, #{}, {})".format(t, self.arg_counter[-1], t))
         self.add_code("(ASSIGN, #{}, @{})".format(self.i + 2, t))
         self.arg_counter[-1] += 8
-
-        # print(self.stack)
 
         if function_symbol.name == "output":
             t3 = self.get_temp()
@@ -380,7 +394,6 @@ class SemanticActions:
 
     def backpatch_func_skip(self, ct):
         func_symbol = self.st.last_symbol[-1]
-        # print_symbol(func_symbol)
         if func_symbol.name != "main":
             self.return_code(ct, False)
             backpatch, _ = self.poop()
@@ -445,14 +458,14 @@ class SemanticActions:
     def save_jump_temp(self, ct):
         self.save(ct)
         t = self.get_temp()
-        self.push(t, "while end temp")
+        self.while_stack.append(t)
+        self.push(t, "while end temp", type='while')
 
-    def label(self, ct):
-        self.push(self.i, "while expression")
+    def label_while(self, ct):
+        self.while_stack.append(self.i)
+        self.push(self.i, "while expression begnning", type='while')
 
     def backpatch_while_condition(self, ct):
-        # print(self.stack)
-        # print(self.stack_flags)
         i, _ = self.poop()
         exp, exp_type = self.poop()
         self.code_block[i] = "(JPF, {}{}, {})".format(
@@ -460,20 +473,23 @@ class SemanticActions:
             exp,
             self.i + 1
         )
-        label, _ = self.poop()
-        temp, _ = self.poop()
+        label, _ = self.poop(type='while')
+        temp, _ = self.poop(type='while')
         i, _ = self.poop()
         self.add_code("(JP, {})".format(label))
         self.code_block[i] = "(ASSIGN, #{}, {})".format(self.i, temp)
 
     def jmp_to_beginning(self, ct):
-        i = self.stack[-3]
+        # i = self.stack[-3]
+        i = self.while_stack[-1]
         self.add_code("(JP, {})".format(i))
 
     def jump_indirect_to_temp(self, ct):
-        self.st.get_last_abnormal_nonfuctional_scope()
-        temp = self.stack[-4]
-        self.add_code("(JP, @{})".format(temp))
+        scope = self.st.get_last_abnormal_nonfuctional_scope()
+        if scope == 'iteration':
+            # temp = self.stack[-4]
+            temp = self.while_stack[-2]
+            self.add_code("(JP, @{})".format(temp))
 
 
 class Symbol:
@@ -740,7 +756,7 @@ class Parser:
             }),
 
             "Iteration-stmt": TransitionDFA({
-                1: {("while", True): (2, [self.sa.save_jump_temp], [self.sa.label])},
+                1: {("while", True): (2, [self.sa.save_jump_temp], [self.sa.label_while])},
                 2: {("(", True): (3, [], [])},
                 3: {("Expression", False): (4, [], [])},
                 4: {(")", True): (5, [], [self.sa.save])},
@@ -1094,7 +1110,7 @@ if __name__ == "__main__":
     os.chdir("../out/")
 
     if sys.platform == "linux":
-        os.system("./tester.out 2> nul")
+        os.system("./tester.out 2> nul.txt")
     else:
-        os.system("tester.exe 2> nul")
+        os.system("tester.exe 2> nul.txt")
     # os.system("tester.exe")

@@ -1,33 +1,153 @@
 int count;
 int result[50];
 
-
-int f(int a, int result[]) {
-    count = count + 1;
-    if(result[a - 1]){
-        return result[a - 1];
+int abs(int a) {
+    if (a < 0) {
+        return -a;
     } else {
-        if (a == 1) {
-            result[a - 1] = 1;
-            return 1;
-        } else if (a == 2){
-            result[a - 1] = 1;
-            return 1;
-        } else {
-            result[a - 1] = f(a - 2, result) + f(a - 1, result);
-            return result[a - 1];
-        }
+        return a;
     }
 }
 
-void main() {
+int isMultiplier(int a, int b) {
     int i;
-    i = 0;
-    while (i < 50) {
-        result[i] = 0;
-        i = i + 1;
+    int step;
+    int flag;
+
+    if (b == 0) {
+        return 0;
+    } else {
+        i = 1;
+        flag = 0;
     }
-    count = 0;
-    output(f(40, result));
-    output(count);
+
+    if (a < 0) {
+        if (b < 0) {
+            i = 1;
+        } else {
+            i = -1;
+        }
+    } else {
+        if (b < 0) {
+            i = -1;
+        } else {
+            i = 1;
+        }
+    }
+    step = i;
+    i = i - abs(i);
+    while (abs(i) < abs(a) + 1) {
+        if (i * b == a) {
+            flag = 1;
+            break;
+        } else {
+            i = i + step;
+            continue;
+        }
+    }
+    return flag;
+
+}
+
+int integerDivision(int a, int b) {
+    int i;
+    int step;
+    int flag;
+
+    if (b == 0) {
+        return 123456789;
+    } else {
+        i = 1;
+        flag = 0;
+    }
+
+    if (a < 0) {
+        if (b < 0) {
+            i = 1;
+            a = a * -1;
+            b = b * -1;
+        } else {
+            i = -1;
+            a = a * -1;
+            b = b * -1;
+        }
+    } else {
+        if (b < 0) {
+            i = -1;
+        } else {
+            i = 1;
+        }
+    }
+    step = i;
+    i = i - abs(i);
+
+    while (abs(i) < abs(a) + 1) {
+        if (i * b == a) {
+            return i;
+        } else {
+            int f1;
+            int f2;
+            f1 = i * b < a;
+            f2 = a < (i + step) * b;
+            if (f1 == f2) {
+                return i + (b == abs(b)) - 1;
+            } else {
+                i = i + step;
+            }
+
+        }
+    }
+    return 123456789;
+}
+
+int isPrime(int a) {
+    int i;
+    int halfa;
+    if (a == 1) {
+        return 0;
+    } else {
+        i = 2;
+        halfa = integerDivision(a, 2);
+        while (i < halfa + 1) {
+            if (isMultiplier(a, i)) {
+                return 0;
+            } else {
+                i = i + 1;
+            }
+        }
+        return 1;
+    }
+
+
+}
+
+void printPrimeNumbersLessThan(int a) {
+    int i;
+    i = 1;
+    while (i < a) {
+        i = i + 1;
+        if (isPrime(i)) {
+            output(i);
+            continue;
+        } else {
+            continue;
+        }
+    }
+
+}
+
+
+
+int main() {
+    int a;
+//    output(abs(5));
+//    output(isMultiplier(0, -8));
+//    output(integerDivision(10, -3));
+//    output(isPrime(37));
+
+    printPrimeNumbersLessThan(30);
+
+//    output
+
+
 }
