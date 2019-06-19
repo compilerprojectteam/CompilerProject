@@ -1,10 +1,33 @@
-int result[10];
+int count;
+int result[50];
 
-int main() {
+
+int f(int a, int result[]) {
+    count = count + 1;
+    if(result[a - 1]){
+        return result[a - 1];
+    } else {
+        if (a == 1) {
+            result[a - 1] = 1;
+            return 1;
+        } else if (a == 2){
+            result[a - 1] = 1;
+            return 1;
+        } else {
+            result[a - 1] = f(a - 2, result) + f(a - 1, result);
+            return result[a - 1];
+        }
+    }
+}
+
+void main() {
     int i;
     i = 0;
-    result[i] = 10;
-    //output(result[0]);
-    output(result[i]);
-
+    while (i < 50) {
+        result[i] = 0;
+        i = i + 1;
+    }
+    count = 0;
+    output(f(40, result));
+    output(count);
 }

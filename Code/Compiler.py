@@ -276,19 +276,20 @@ class SemanticActions:
         self.push(t, "direct temp")
 
     def add_to_var(self, ct):
+        t = self.get_temp()
+        resolved_addr = self.get_temp()
+
         exp, exp_type = self.poop()
         addr, addr_type = self.poop()
-
-        if exp_type == "indirect":
-            t = self.get_temp()
+        if "indirect" in exp_type:
             self.add_code("(ASSIGN, @{}, {})".format(exp, t))
             self.add_code("(MULT, {}, #4, {})".format(t, t))
-            self.add_code("(ADD, {}, {}, {})".format(addr, t, addr))
+            self.add_code("(ADD, {}, {}, {})".format(addr, t, resolved_addr))
         else:
-            self.add_code("(MULT, {}, #4, {})".format(exp, exp))
-            self.add_code("(ADD, {}, {}, {})".format(addr, exp, addr))
+            self.add_code("(MULT, {}, #4, {})".format(exp, t))
+            self.add_code("(ADD, {}, {}, {})".format(addr, t, resolved_addr))
 
-        self.push(addr, "indirect temp")
+        self.push(resolved_addr, "indirect temp")
 
     def start(self, ct):
         self.add_code("(ASSIGN, #0, {})".format(SymbolTable.RETURN_VALUE_ADDRESS))
