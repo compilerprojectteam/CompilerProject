@@ -33,7 +33,7 @@ Expression-stmt -> continue #jmp_to_beginning;
 Expression-stmt -> break #jump_indirect_to_temp
 Expression-stmt -> ;
 Selection-stmt -> if ( Expression ) #save Statement #save #backpatch_if else Statement #backpatch_else
-Iteration-stmt -> #save_jump_temp while #label ( Expression ) #save Statement #backpatch_while_condition #close_scope
+Iteration-stmt -> #save_jump_temp while #label_while ( Expression ) #save Statement #backpatch_while_condition #close_scope
 Return-stmt -> return Return-stmt-prime
 Return-stmt-prime -> #return_code ;
 Return-stmt-prime -> Expression #return_code_expression ;

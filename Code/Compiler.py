@@ -31,14 +31,18 @@ class SemanticActions:
         self.while_stack = []
         self.while_stack_flags = []
 
-    def get_temp(self):
-        temp = 500
+    def get_temps_in_use(self):
         temps_in_stack = [var for var, var_type in
-                          zip(self.stack, self.stack_flags)
-                          if "temp" in var_type]
-        temps_in_stack = temps_in_stack + [var for var, var_type in
                                            zip(self.while_stack, self.while_stack_flags)
                                            if "temp" in var_type]
+        temps_in_stack = temps_in_stack + [var for var, var_type in
+                          zip(self.stack, self.stack_flags)
+                          if "temp" in var_type]
+        return temps_in_stack
+
+    def get_temp(self):
+        temp = 500
+        temps_in_stack = self.get_temps_in_use()
         while True:
             if temp not in temps_in_stack:
                 return temp
@@ -192,23 +196,21 @@ class SemanticActions:
 
     def push_temp_vars(self, ct):
         base = self.st.STACK_BLOCK_SIZE // 2
-        for var, var_type in zip(self.stack, self.stack_flags):
-            if "temp" in var_type:
-                t = self.get_temp()
-                self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
-                self.add_code("(SUB, {}, #{}, {})".format(t, base, t))
-                self.add_code("(ASSIGN, {}, @{})".format(var, t))
-                base += 4
+        for var in self.get_temps_in_use():
+            t = self.get_temp()
+            self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
+            self.add_code("(SUB, {}, #{}, {})".format(t, base, t))
+            self.add_code("(ASSIGN, {}, @{})".format(var, t))
+            base += 4
 
     def poop_temp_vars(self, ct):
         base = self.st.STACK_BLOCK_SIZE // 2
-        for var, var_type in zip(self.stack[:-1], self.stack_flags[:-1]):
-            if "temp" in var_type:
-                t = self.get_temp()
-                self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
-                self.add_code("(SUB, {}, #{}, {})".format(t, base, t))
-                self.add_code("(ASSIGN, @{}, {})".format(t, var))
-                base += 4
+        for var in self.get_temps_in_use()[:-1]:
+            t = self.get_temp()
+            self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
+            self.add_code("(SUB, {}, #{}, {})".format(t, base, t))
+            self.add_code("(ASSIGN, @{}, {})".format(t, var))
+            base += 4
 
     def pop_arg_counter(self, ct):
         self.arg_counter.pop()
@@ -458,11 +460,9 @@ class SemanticActions:
     def save_jump_temp(self, ct):
         self.save(ct)
         t = self.get_temp()
-        self.while_stack.append(t)
         self.push(t, "while end temp", type='while')
 
     def label_while(self, ct):
-        self.while_stack.append(self.i)
         self.push(self.i, "while expression begnning", type='while')
 
     def backpatch_while_condition(self, ct):
@@ -487,7 +487,6 @@ class SemanticActions:
     def jump_indirect_to_temp(self, ct):
         scope = self.st.get_last_abnormal_nonfuctional_scope()
         if scope == 'iteration':
-            # temp = self.stack[-4]
             temp = self.while_stack[-2]
             self.add_code("(JP, @{})".format(temp))
 
@@ -1103,7 +1102,7 @@ if __name__ == "__main__":
         i = 0
         for line in p.sa.code_block:
             f.write("{}\t{}\n".format(i, line))
-            print("{}\t{}".format(i, line))
+            # print("{}\t{}".format(i, line))
             i += 1
         f.close()
 
