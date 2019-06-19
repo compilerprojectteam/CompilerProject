@@ -30,14 +30,19 @@ class SemanticActions:
         self.arg_counter = []
         self.while_stack = []
         self.while_stack_flags = []
+        self.switch_stack = []
+        self.switch_stack_flags = []
 
     def get_temps_in_use(self):
         temps_in_stack = [var for var, var_type in
-                                           zip(self.while_stack, self.while_stack_flags)
+                          zip(self.while_stack, self.while_stack_flags)
+                          if "temp" in var_type]
+        temps_in_stack = temps_in_stack + [var for var, var_type in
+                                           zip(self.switch_stack, self.switch_stack_flags)
                                            if "temp" in var_type]
         temps_in_stack = temps_in_stack + [var for var, var_type in
-                          zip(self.stack, self.stack_flags)
-                          if "temp" in var_type]
+                                           zip(self.stack, self.stack_flags)
+                                           if "temp" in var_type]
         return temps_in_stack
 
     def get_temp(self):
@@ -55,6 +60,9 @@ class SemanticActions:
         elif type == "while":
             self.while_stack.append(t)
             self.while_stack_flags.append(flag)
+        elif type == 'switch':
+            self.switch_stack.append(t)
+            self.switch_stack_flags.append(flag)
         else:
             pass
 
@@ -65,6 +73,9 @@ class SemanticActions:
         elif type == "while":
             stack = self.while_stack
             stack_flags = self.while_stack_flags
+        elif type == 'switch':
+            stack = self.switch_stack
+            stack_flags = self.switch_stack_flags
         else:
             stack = None
             stack_flags = None
@@ -458,9 +469,15 @@ class SemanticActions:
             self.st.heap_pointer += 4 * int(ct.value)
 
     def save_jump_temp(self, ct):
-        self.save(ct)
-        t = self.get_temp()
-        self.push(t, "while end temp", type='while')
+        scope_type = self.st.get_last_abnormal_nonfuctional_scope()
+        if scope_type == 'iteration':
+            self.save(ct)
+            t = self.get_temp()
+            self.push(t, "while end temp", type='while')
+        elif scope_type == 'switch':
+            self.save(ct)
+            t = self.get_temp()
+            self.push(t, "switch end temp", type='switch')
 
     def label_while(self, ct):
         self.push(self.i, "while expression begnning", type='while')
@@ -489,6 +506,35 @@ class SemanticActions:
         if scope == 'iteration':
             temp = self.while_stack[-2]
             self.add_code("(JP, @{})".format(temp))
+        elif scope == 'switch':
+            temp = self.switch_stack[-1]
+            self.add_code("(JP, @{})".format(temp))
+        else:
+            pass
+
+    def compare_case(self, ct):
+        t = self.get_temp()
+        num, _ = self.poop()
+        exp, exp_type = self.stack[-1], self.stack_flags[-1]
+        self.add_code("(EQ, {}{}, {}, {})".format(
+            "@" if "indirect" in exp_type else "",
+            exp,
+            num,
+            t
+        ))
+        self.push(t, "direct temp")
+
+    def backpatch_switch_inner(self, ct):
+        i, _ = self.poop()
+        t, _ = self.poop()
+        self.code_block[i] = "(JPF, {}, {})".format(t, self.i + 1)
+
+    def backpath_switch_outer(self, ct):
+        exp, exp_type = self.poop()
+        i, _ = self.poop()
+        temp, _ = self.poop(type='switch')
+        self.code_block[i] = "(ASSIGN, #{}, {})".format(self.i, temp)
+
 
 
 class Symbol:
@@ -774,14 +820,14 @@ class Parser:
             }),
 
             "Switch-stmt": TransitionDFA({
-                1: {("switch", True): (2, [], [])},
+                1: {("switch", True): (2, [self.sa.save_jump_temp], [])},
                 2: {("(", True): (3, [], [])},
                 3: {("Expression", False): (4, [], [])},
                 4: {(")", True): (5, [], [])},
                 5: {("{", True): (6, [], [])},
                 6: {("Case-stmts", False): (7, [], [])},
                 7: {("Default-stmt", False): (8, [], [])},
-                8: {("}", True): (-1, [], [])},
+                8: {("}", True): (-1, [], [self.sa.backpath_switch_outer, self.sa.close_scope])},
 
             }),
 
@@ -793,9 +839,10 @@ class Parser:
 
             "Case-stmt": TransitionDFA({
                 1: {("case", True): (2, [], [])},
-                2: {("NUM", True): (3, [], [])},
-                3: {(":", True): (4, [], [])},
-                4: {("Statement-list", False): (-1, [], [])},
+                2: {("NUM", True): (3, [self.sa.save_to_temp], [self.sa.compare_case])},
+                3: {(":", True): (4, [], [self.sa.save])},
+                4: {("Statement-list", False): (
+                -1, [], [self.sa.backpatch_switch_inner, self.sa.jump_indirect_to_temp])},
             }),
 
             "Default-stmt": TransitionDFA({
@@ -1102,7 +1149,7 @@ if __name__ == "__main__":
         i = 0
         for line in p.sa.code_block:
             f.write("{}\t{}\n".format(i, line))
-            # print("{}\t{}".format(i, line))
+            print("{}\t{}".format(i, line))
             i += 1
         f.close()
 

@@ -37,10 +37,10 @@ Iteration-stmt -> #save_jump_temp while #label_while ( Expression ) #save Statem
 Return-stmt -> return Return-stmt-prime
 Return-stmt-prime -> #return_code ;
 Return-stmt-prime -> Expression #return_code_expression ;
-Switch-stmt -> #save_jump_temp switch ( Expression ) { Case-stmts Default-stmt }
+Switch-stmt -> #save_jump_temp switch ( Expression ) { Case-stmts Default-stmt } #backpath_switch_outer #close_scope
 Case-stmts -> Case-stmt Case-stmts
 Case-stmts -> ε
-Case-stmt -> case num : Statement-list
+Case-stmt -> case #save_to_temp num #compare_case #save: Statement-list #backpatch_switch_inner #jump_indirect_to_temp
 Default-stmt -> default : Statement-list
 Default-stmt -> ε
 
