@@ -1,4 +1,4 @@
-Program -> #start Declaration-list #close_scope eof
+Program -> #save #start Declaration-list #check_main #close_scope eof #end
 Declaration-list -> Declaration Declaration-list
 Declaration-list -> ε
 Declaration -> Declaration-initial Declaration-prime
@@ -35,9 +35,9 @@ Expression-stmt -> ;
 Selection-stmt -> if ( Expression ) #save Statement #save #backpatch_if else Statement #backpatch_else
 Iteration-stmt -> #save_jump_temp while #label_while ( Expression ) #save Statement #backpatch_while_condition #close_scope
 Return-stmt -> return Return-stmt-prime
-Return-stmt-prime -> #return_code ;
+Return-stmt-prime -> #return_code_empty ;
 Return-stmt-prime -> Expression #return_code_expression ;
-Switch-stmt -> #save_jump_temp switch ( Expression ) { Case-stmts Default-stmt } #backpath_switch_outer #close_scope
+Switch-stmt -> #save_jump_temp switch ( Expression ) { Case-stmts Default-stmt } #backpatch_switch_outer #close_scope
 Case-stmts -> Case-stmt Case-stmts
 Case-stmts -> ε
 Case-stmt -> case #save_to_temp num #compare_case #save: Statement-list #backpatch_switch_inner #jump_indirect_to_temp

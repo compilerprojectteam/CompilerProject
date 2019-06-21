@@ -1,19 +1,29 @@
-int f(int a, int c) {
+int k[100];
+
+
+int f(int a) {
     int g(int b) {
         output(b);
-        f(b - 1,5);
+        return f(b - 1);
     }
     if (a == 1) {
         output(a);
-        return 0;
+        return 1;
     } else {
-        g(a);
+        return g(a);
     }
-
-
 }
 
+void h(int l){
+    l * 5;
+}
 
 void main(void) {
-    f(10,4);
+    int j;
+    int g[10];
+    f(5);
+    f(10);
+    if(f(2)){
+        j = 2;
+    } else ;
 }

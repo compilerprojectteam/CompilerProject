@@ -31,6 +31,7 @@ class SemanticActions:
         self.stack_flags = []
         self.code_block = []
         self.arg_counter = []
+        self.func_args_stack = []
         self.while_stack = []
         self.while_stack_flags = []
         self.switch_stack = []
@@ -102,6 +103,11 @@ class SemanticActions:
 
     def backpatch_if(self, ct):
         exp, exp_type = self.stack[-3], self.stack_flags[-3]
+
+        exp_type_error = self.check_bad_exp_type(exp_type)
+        if exp_type_error:
+            return exp_type_error
+
         backpatch = self.stack[-2]
         self.code_block[backpatch] = "(JPF, {}{}, {})".format(
             "@" if "indirect" in exp_type else "",
@@ -119,6 +125,15 @@ class SemanticActions:
         exp2, exp2_type = self.poop()
         addop, _ = self.poop()
         exp1, exp1_type = self.poop()
+
+        exp_type_error = self.check_bad_exp_type(exp1_type)
+        if exp_type_error:
+            return exp_type_error
+
+        exp_type_error = self.check_bad_exp_type(exp2_type)
+        if exp_type_error:
+            return exp_type_error
+
         self.add_code("({}, {}{}, {}{}, {})".format(
             "ADD" if addop == "+" else "SUB",
             "@" if "indirect" in exp1_type else "",
@@ -134,6 +149,15 @@ class SemanticActions:
         exp2, exp2_type = self.poop()
         relop, _ = self.poop()
         exp1, exp1_type = self.poop()
+
+        exp_type_error = self.check_bad_exp_type(exp1_type)
+        if exp_type_error:
+            return exp_type_error
+
+        exp_type_error = self.check_bad_exp_type(exp2_type)
+        if exp_type_error:
+            return exp_type_error
+
         self.add_code("({}, {}{}, {}{}, {})".format(
             "LT" if relop == "<" else "EQ",
             "@" if "indirect" in exp1_type else "",
@@ -151,6 +175,15 @@ class SemanticActions:
         t = self.get_temp()
         exp1, exp1_type = self.poop()
         exp2, exp2_type = self.poop()
+
+        exp_type_error = self.check_bad_exp_type(exp1_type)
+        if exp_type_error:
+            return exp_type_error
+
+        exp_type_error = self.check_bad_exp_type(exp2_type)
+        if exp_type_error:
+            return exp_type_error
+
         self.add_code("(MULT, {}{}, {}{}, {})".format(
             "@" if "indirect" in exp1_type else "",
             exp1,
@@ -163,6 +196,11 @@ class SemanticActions:
     def negate_expression(self, ct):
         t = self.get_temp()
         exp, exp_type = self.poop()
+
+        exp_type_error = self.check_bad_exp_type(exp_type)
+        if exp_type_error:
+            return exp_type_error
+
         self.add_code("(ASSIGN, {}{}, {})".format(
             "@" if "indirect" in exp_type else "",
             exp,
@@ -186,14 +224,18 @@ class SemanticActions:
         exp, exp_type = self.poop()
 
         if "array" in exp_type:
+            arg_type = "array"
             type_specifier = ""
         else:
+            arg_type = "int"
             type_specifier = "@" if "indirect" in exp_type else ""
 
         self.add_code("(ASSIGN, {}{}, @{})".format(type_specifier,
                                                    exp,
                                                    t))
         self.arg_counter[-1] += 4
+
+        self.func_args_stack[-1].append(arg_type)
 
     def inc_stack_pointer(self, ct):
         self.add_code("(ADD, {}, #{}, {})".format(SymbolTable.STACK_BASE,
@@ -206,6 +248,7 @@ class SemanticActions:
                                                   SymbolTable.STACK_BASE, ))
 
     def push_arg_counter(self, ct):
+        self.func_args_stack.append([])
         self.arg_counter.append(-SymbolTable.STACK_BLOCK_SIZE)
 
     def push_temp_vars(self, ct):
@@ -227,6 +270,7 @@ class SemanticActions:
             base += 4
 
     def pop_arg_counter(self, ct):
+        self.func_args_stack.pop()
         self.arg_counter.pop()
 
     def push_func_stuff(self, ct):
@@ -235,6 +279,18 @@ class SemanticActions:
 
         function_symbol, _ = self.poop()
         function_address, _ = self.poop()
+
+        if len(function_symbol.args) != len(self.func_args_stack[-1]):
+            return "Mismatch in numbers of arguments of '{}'.".format(function_symbol.name)
+
+        for j in range(len(function_symbol.args)):
+            if function_symbol.args[j] != self.func_args_stack[-1][j]:
+                return "Mismatch in type of argument {} of '{}'. Expected '{}' but got '{}' instead.".format(
+                    j + 1,
+                    function_symbol.name,
+                    function_symbol.args[j],
+                    self.func_args_stack[-1][j]
+                )
 
         parent_func = function_symbol.parent_func
 
@@ -266,7 +322,7 @@ class SemanticActions:
                     else:
                         self.add_code("(ASSIGN, @{}, {})".format(current_temp, current_temp))
                         parent_q_offset = -SymbolTable.STACK_BLOCK_SIZE + 4 * (
-                                current_func.parent_func.n_args + SymbolTable.N_STACK_VARS)
+                            current_func.parent_func.n_args + SymbolTable.N_STACK_VARS)
                         self.add_code("(ADD, {}, #{}, {})".format(current_temp, parent_q_offset, current_temp))
 
                 self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
@@ -290,11 +346,23 @@ class SemanticActions:
         ret_value = self.get_temp()
         self.add_code("(ASSIGN, {}, {})".format(SymbolTable.RETURN_VALUE_ADDRESS,
                                                 ret_value))
-        self.push(ret_value, "temp")
+
+        if function_symbol.type == "void":
+            self.push(ret_value, "temp void_func_output")
+        else:
+            self.push(ret_value, "temp")
 
     def assign(self, ct):
         rhs, rhs_type = self.poop()
         lhs, lhs_type = self.poop()
+
+        exp_type_error = self.check_bad_exp_type(rhs_type)
+        if exp_type_error:
+            return exp_type_error
+
+        exp_type_error = self.check_bad_exp_type(lhs_type)
+        if exp_type_error:
+            return exp_type_error
 
         self.add_code("(ASSIGN, {}{}, {}{})".format("@" if "indirect" in rhs_type else "",
                                                     rhs,
@@ -313,6 +381,11 @@ class SemanticActions:
 
         exp, exp_type = self.poop()
         addr, addr_type = self.poop()
+
+        exp_type_error = self.check_bad_exp_type(exp_type)
+        if exp_type_error:
+            return exp_type_error
+
         if "indirect" in exp_type:
             self.add_code("(ASSIGN, @{}, {})".format(exp, t))
             self.add_code("(MULT, {}, #4, {})".format(t, t))
@@ -335,6 +408,27 @@ class SemanticActions:
         self.st.symbol_table[-1]["output"].n_args = 1
         self.st.symbol_table[-1]["output"].address = 0
         self.st.symbol_table[-1]["output"].args.append("int")
+
+    def check_main(self, ct):
+        main_symbol = self.st.resolve_symbol("main")
+
+        if not main_symbol:
+            return 'main function not found!'
+
+        if main_symbol.type != "void" or main_symbol.args != []:
+            return "main function signature should be like 'void main(void)'"
+
+        if self.st.last_symbol[0].name != "main":
+            return 'last function is not main'
+
+    def end(self, ct):
+        self.add_code('(ADD, {}, {}, {})'.format(SymbolTable.STACK_BASE,
+                                                 SymbolTable.STACK_BASE,
+                                                 SymbolTable.STACK_BASE))
+
+        j, _ = self.poop()
+        self.code_block[j] = "(ASSIGN, #{}, {})".format(self.i - 1,
+                                                        SymbolTable.END_OF_PROGRAM_LINE)
 
     def pid(self, ct):
         id_name = ct.value
@@ -385,32 +479,61 @@ class SemanticActions:
         self.st.last_symbol[-2].n_args += 1
 
     def return_code(self, ct, still_in_scope=True):
-
         if still_in_scope:
-            i = self.st.get_last_function_scope()
-            func_symbol = self.st.last_symbol[i - 1]
+            j = self.st.get_last_function_scope()
+            func_symbol = self.st.last_symbol[j - 1]
         else:
             func_symbol = self.st.last_symbol[-1]
 
-        offset = -SymbolTable.STACK_BLOCK_SIZE + func_symbol.n_args * 4
-        t = self.get_temp()
-        self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
-        self.add_code("(ADD, {}, #{}, {})".format(t, offset, t))
-        self.add_code("(ASSIGN, @{}, {})".format(t, t))
-        self.add_code("(JP, @{})".format(t))
+        if func_symbol.name == "main":
+            self.add_code("(JP, @{})".format(SymbolTable.END_OF_PROGRAM_LINE))
+        else:
+            offset = -SymbolTable.STACK_BLOCK_SIZE + func_symbol.n_args * 4
+            t = self.get_temp()
+            self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
+            self.add_code("(ADD, {}, #{}, {})".format(t, offset, t))
+            self.add_code("(ASSIGN, @{}, {})".format(t, t))
+            self.add_code("(JP, @{})".format(t))
 
-    def return_code_expression(self, ct, still_in_scope=True):
+        return None
+
+    def return_code_emtpy(self, ct):
+        j = self.st.get_last_function_scope()
+        func_symbol = self.st.last_symbol[j - 1]
+        if func_symbol.type == "int":
+            return "int type function '{}' must return something.".format(func_symbol.name)
+
+        return self.return_code(ct, True)
+
+    def return_code_expression(self, ct):
+        j = self.st.get_last_function_scope()
+        func_symbol = self.st.last_symbol[j - 1]
+        if func_symbol.type == "void":
+            return "void type function '{}' must not return any value.".format(func_symbol.name)
+
         exp, exp_type = self.poop()
+
+        exp_type_error = self.check_bad_exp_type(exp_type)
+        if exp_type_error:
+            return exp_type_error
+
         self.add_code("(ASSIGN, {}{}, {})".format("@" if "indirect" in exp_type else "",
                                                   exp,
                                                   SymbolTable.RETURN_VALUE_ADDRESS))
 
-        self.return_code(ct)
+        return self.return_code(ct, True)
 
     def backpatch_func_skip(self, ct):
         func_symbol = self.st.last_symbol[-1]
+
+        # if func_symbol.type == "int":
+        #     return "int type function '{}' must return something.".format(func_symbol.name)
+
         if func_symbol.name != "main":
-            self.return_code(ct, False)
+            semantic_error = self.return_code(ct, False)
+            if semantic_error:
+                return semantic_error
+
             backpatch, _ = self.poop()
             self.code_block[backpatch] = ("(JP, {})".format(self.i))
 
@@ -419,8 +542,7 @@ class SemanticActions:
         self.st.stack_pointer[i] += 4
 
     def void_type_error(self, ct):
-        name = self.st.last_symbol[-2].name
-        return "Illegal type of void for '{}' in declaration of '{}'".format(ct.value, name)
+        return "Illegal type of void for '{}'".format(ct.value)
 
     def start_normal_scope(self, ct):
         self.st.start_new_scope("normal")
@@ -448,6 +570,9 @@ class SemanticActions:
 
     def set_var_address(self, ct):
         last_symbol = self.st.get_last_symbol()
+
+        if last_symbol.type == "void":
+            return "Illegal type of void for '{}'".format(last_symbol.name)
 
         if self.st.get_current_memory_type() == "stack":
             i = self.st.get_last_function_scope()
@@ -489,6 +614,11 @@ class SemanticActions:
     def backpatch_while_condition(self, ct):
         i, _ = self.poop()
         exp, exp_type = self.poop()
+
+        exp_type_error = self.check_bad_exp_type(exp_type)
+        if exp_type_error:
+            return exp_type_error
+
         self.code_block[i] = "(JPF, {}{}, {})".format(
             "@" if "indirect" in exp_type else "",
             exp,
@@ -502,6 +632,10 @@ class SemanticActions:
 
     def jmp_to_beginning(self, ct):
         # i = self.stack[-3]
+
+        if len(self.while_stack) == 0:
+            return "No 'while' found for 'continue'"
+
         i = self.while_stack[-1]
         self.add_code("(JP, {})".format(i))
 
@@ -514,12 +648,17 @@ class SemanticActions:
             temp = self.switch_stack[-1]
             self.add_code("(JP, @{})".format(temp))
         else:
-            pass
+            return "No 'while' or 'switch' found for 'break'."
 
     def compare_case(self, ct):
         t = self.get_temp()
         num, _ = self.poop()
         exp, exp_type = self.stack[-1], self.stack_flags[-1]
+
+        exp_type_error = self.check_bad_exp_type(exp_type)
+        if exp_type_error:
+            return exp_type_error
+
         self.add_code("(EQ, {}{}, {}, {})".format(
             "@" if "indirect" in exp_type else "",
             exp,
@@ -533,12 +672,24 @@ class SemanticActions:
         t, _ = self.poop()
         self.code_block[i] = "(JPF, {}, {})".format(t, self.i + 1)
 
-    def backpath_switch_outer(self, ct):
+    def backpatch_switch_outer(self, ct):
         exp, exp_type = self.poop()
+
+        exp_type_error = self.check_bad_exp_type(exp_type)
+        if exp_type_error:
+            return exp_type_error
+
         i, _ = self.poop()
         temp, _ = self.poop(type='switch')
         self.code_block[i] = "(ASSIGN, #{}, {})".format(self.i, temp)
 
+    @staticmethod
+    def check_bad_exp_type(exp_type):
+        if "array" in exp_type:
+            return 'Type mismatch in operands.'
+        if "void_func_output" in exp_type:
+            return 'void type function has no output.'
+        return None
 
 
 class Symbol:
@@ -563,6 +714,7 @@ class SymbolTable:
     N_STACK_VARS = 1
     STACK_BASE = 1500
     RETURN_VALUE_ADDRESS = 1504
+    END_OF_PROGRAM_LINE = 1508
     STACK_BLOCK_SIZE = 200
 
     def __init__(self):
@@ -639,6 +791,7 @@ class Parser:
         self.sa = SemanticActions(self.st)
         self.scanner_tokens = self.scanner.scan_file_ignore_extra(file_name)
         self.current_token = None
+        self.current_line_number = None
 
         self.first = {}
         self.follow = {}
@@ -679,8 +832,8 @@ class Parser:
 
         self.dfas = {
             "Program": TransitionDFA({
-                1: {("Declaration-list", False): (2, [self.sa.start], [])},
-                2: {("EOF", True): (-1, [self.sa.close_scope], [])}
+                1: {("Declaration-list", False): (2, [self.sa.save, self.sa.start], [])},
+                2: {("EOF", True): (-1, [self.sa.check_main, self.sa.close_scope], [self.sa.end])}
             }),
 
             "Declaration-list": TransitionDFA({
@@ -815,7 +968,7 @@ class Parser:
             }),
 
             "Return-stmt-prime": TransitionDFA({
-                1: {(";", True): (-1, [self.sa.return_code], []),
+                1: {(";", True): (-1, [self.sa.return_code_emtpy], []),
                     ("Expression", False): (2, [], [])},
                 2: {(";", True): (-1, [self.sa.return_code_expression], [])}
             }),
@@ -828,7 +981,7 @@ class Parser:
                 5: {("{", True): (6, [], [])},
                 6: {("Case-stmts", False): (7, [], [])},
                 7: {("Default-stmt", False): (8, [], [])},
-                8: {("}", True): (-1, [], [self.sa.backpath_switch_outer, self.sa.close_scope])},
+                8: {("}", True): (-1, [], [self.sa.backpatch_switch_outer, self.sa.close_scope])},
 
             }),
 
@@ -843,7 +996,7 @@ class Parser:
                 2: {("NUM", True): (3, [self.sa.save_to_temp], [self.sa.compare_case])},
                 3: {(":", True): (4, [], [self.sa.save])},
                 4: {("Statement-list", False): (
-                -1, [], [self.sa.backpatch_switch_inner, self.sa.jump_indirect_to_temp])},
+                    -1, [], [self.sa.backpatch_switch_inner, self.sa.jump_indirect_to_temp])},
             }),
 
             "Default-stmt": TransitionDFA({
@@ -1170,4 +1323,4 @@ if __name__ == "__main__":
             os.system("./tester.out 2> /dev/null")
         else:
             os.system("tester.exe 2> nul")
-    # os.system("tester.exe")
+            # os.system("tester.exe")
