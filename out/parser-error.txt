@@ -1,5 +1,0 @@
-#4 : Syntax Error! Missing Params
-#23 : Syntax Error! Missing Params
-#51 : Syntax Error! Missing Params
-#141 : Syntax Error! Missing Params
-#153 : Semantic Error! main function signature should be like 'void main(void)'

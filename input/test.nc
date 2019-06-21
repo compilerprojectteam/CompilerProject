@@ -3,6 +3,7 @@ int k[100];
 
 int f(int a) {
     int g(int b) {
+        int a;
         output(b);
         return f(b - 1);
     }
@@ -20,10 +21,12 @@ void h(int l){
 
 void main(void) {
     int j;
-    int g[10];
-    f(5);
-    f(10);
-    if(f(2)){
-        j = 2;
-    } else ;
+    j = 5;
+    switch(j){
+        case 5: output(2);
+        case 4: output(1);
+        case 3: {output(0); break;}
+        default: output(8);
+    }
+
 }

@@ -558,6 +558,10 @@ class SemanticActions:
 
     def create_symbol(self, ct):
         ttype, _ = self.poop()
+
+        if ct.value in self.st.symbol_table[-1]:
+            return "'{}' already declared in this scope".format(ct.value)
+
         self.st.add_symbol(ct.value, ttype=ttype)
 
     def set_fun_address(self, ct):
@@ -686,9 +690,11 @@ class SemanticActions:
     @staticmethod
     def check_bad_exp_type(exp_type):
         if "array" in exp_type:
-            return 'Type mismatch in operands.'
+            return 'Type mismatch in operands, Got array instead of int.'
         if "void_func_output" in exp_type:
             return 'void type function has no output.'
+        if "function" in exp_type:
+            return 'Type mismatch in operands. Got function instead of int.'
         return None
 
 
@@ -803,8 +809,8 @@ class Parser:
     def load_dict(name):
         dictionary = {}
 
-        with open("../resources/" + name + ".csv", encoding='utf-8') as f:
-            for a in f.readlines():
+        with open("../resources/" + name + ".csv", encoding='utf-8') as file:
+            for a in file.readlines():
                 key = a[:a.find("\t")]
                 value = a[a.find("\t") + 1:]
 
@@ -815,10 +821,10 @@ class Parser:
 
                 values = value.split()
                 values = [a.replace("ε", "")
-                              .replace("id", "ID")
-                              .replace("voID", "void")
-                              .replace("num", "NUM")
-                              .replace("eof", "EOF") for a in values]
+                           .replace("id", "ID")
+                           .replace("voID", "void")
+                           .replace("num", "NUM")
+                           .replace("eof", "EOF") for a in values]
 
                 dictionary[key] = values
 
