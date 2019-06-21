@@ -9,6 +9,10 @@ parser_errors = None
 scanner_output = None
 
 
+def error(message):
+    parser_errors.write(message + "\n")
+
+
 class TransitionDFA:
     def __init__(self, transitions):
         self.transitions = transitions
@@ -23,7 +27,6 @@ class SemanticActions:
     def __init__(self, symbol_table):
         self.st = symbol_table
         self.i = 0
-        self.type = None
         self.stack = []
         self.stack_flags = []
         self.code_block = []
@@ -337,8 +340,7 @@ class SemanticActions:
         id_name = ct.value
         symbol = self.st.resolve_symbol(id_name)
         if not symbol:
-            print_semantic_error("ID {} is not defined".format(id_name))
-            return
+            return "'{}' is not defined".format(id_name)
 
         if symbol.is_function:
             self.push(symbol.address, "function")
@@ -417,7 +419,8 @@ class SemanticActions:
         self.st.stack_pointer[i] += 4
 
     def void_type_error(self, ct):
-        print_semantic_error("error")
+        name = self.st.last_symbol[-2].name
+        return "Illegal type of void for '{}' in declaration of '{}'".format(ct.value, name)
 
     def start_normal_scope(self, ct):
         self.st.start_new_scope("normal")
@@ -429,10 +432,11 @@ class SemanticActions:
         self.st.remove_last_scope()
 
     def save_type(self, ct):
-        self.type = ct.value
+        self.push(ct.value, "type")
 
     def create_symbol(self, ct):
-        self.st.add_symbol(ct.value, ttype=self.type)
+        ttype, _ = self.poop()
+        self.st.add_symbol(ct.value, ttype=ttype)
 
     def set_fun_address(self, ct):
         last_symbol = self.st.get_last_symbol()
@@ -623,10 +627,6 @@ class SymbolTable:
                 return stype
 
 
-def error(message):
-    parser_errors.write(message + "\n")
-
-
 class Parser:
     '''
     Args:
@@ -638,12 +638,13 @@ class Parser:
         self.st = SymbolTable()
         self.sa = SemanticActions(self.st)
         self.scanner_tokens = self.scanner.scan_file_ignore_extra(file_name)
-
         self.current_token = None
 
         self.first = {}
         self.follow = {}
         self.init_dfas()
+
+        self.is_code_generation_stopped = False
 
     @staticmethod
     def load_dict(name):
@@ -1037,6 +1038,15 @@ class Parser:
                 error("Lexical Error in line #{} : invalid token {}".format(self.current_line_number,
                                                                             self.current_token.value))
 
+    def perform_semantic_actions(self, funcs):
+        if not self.is_code_generation_stopped:
+            for func in funcs:
+                semantic_error = func(self.current_token)
+                if semantic_error is not None:
+                    self.is_code_generation_stopped = True
+                    error("#{} : Semantic Error! {}".format(self.current_line_number, semantic_error))
+                    break
+
     def parse_from_non_terminal(self, V):
         # print("parsing from non terminal : ", V)
         me = Node(V, parent=None)
@@ -1054,8 +1064,8 @@ class Parser:
                 if var == "Epsilon":
                     if c in self.follow[V]:
                         current_state, fs_before, fs_after = transitions[current_state][(var, True)]
-                        [f(self.current_token) for f in fs_before]
-                        [f(self.current_token) for f in fs_after]
+                        self.perform_semantic_actions(fs_before)
+                        self.perform_semantic_actions(fs_after)
 
                         current_state = -1
                         Node("epsilon", me)
@@ -1065,15 +1075,15 @@ class Parser:
                     if c == var:
                         if c == Token.EOF:
                             current_state, fs_before, fs_after = transitions[current_state][(var, True)]
-                            [f(self.current_token) for f in fs_before]
-                            [f(self.current_token) for f in fs_after]
+                            self.perform_semantic_actions(fs_before)
+                            self.perform_semantic_actions(fs_after)
                             Node(c, parent=me)
                             break
                         else:
                             current_state, fs_before, fs_after = transitions[current_state][(var, True)]
-                            [f(self.current_token) for f in fs_before]
+                            self.perform_semantic_actions(fs_before)
                             self.get_next_token()
-                            [f(self.current_token) for f in fs_after]
+                            self.perform_semantic_actions(fs_after)
 
                             Node(value, parent=me)
                             break
@@ -1090,10 +1100,10 @@ class Parser:
 
                     if c in self.first[var]:
                         _, fs_before, fs_after = transitions[current_state][(var, False)]
-                        [f(self.current_token) for f in fs_before]
+                        self.perform_semantic_actions(fs_before)
 
                         result, node = self.parse_from_non_terminal(var)
-                        [f(self.current_token) for f in fs_after]
+                        self.perform_semantic_actions(fs_after)
 
                         node.parent = me
                         if not result:
@@ -1104,10 +1114,10 @@ class Parser:
                         if self.is_nullable(var):
                             if c in self.follow[var]:
                                 _, fs_before, fs_after = transitions[current_state][(var, False)]
-                                [f(self.current_token) for f in fs_before]
+                                self.perform_semantic_actions(fs_before)
 
                                 result, node = self.parse_from_non_terminal(var)
-                                [f(self.current_token) for f in fs_after]
+                                self.perform_semantic_actions(fs_after)
 
                                 node.parent = me
                                 if not result:
@@ -1153,10 +1163,11 @@ if __name__ == "__main__":
             i += 1
         f.close()
 
-    os.chdir("../out/")
+    if not p.is_code_generation_stopped:
+        os.chdir("../out/")
 
-    if sys.platform == "linux":
-        os.system("./tester.out 2> /dev/null")
-    else:
-        os.system("tester.exe 2> nul")
+        if sys.platform == "linux":
+            os.system("./tester.out 2> /dev/null")
+        else:
+            os.system("tester.exe 2> nul")
     # os.system("tester.exe")

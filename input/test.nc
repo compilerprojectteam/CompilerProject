@@ -1,7 +1,7 @@
-int f(int a) {
+int f(int a, int c) {
     int g(int b) {
         output(b);
-        f(b - 1);
+        f(b - 1,5);
     }
     if (a == 1) {
         output(a);
@@ -15,5 +15,5 @@ int f(int a) {
 
 
 void main(void) {
-    f(10);
+    f(10,4);
 }
