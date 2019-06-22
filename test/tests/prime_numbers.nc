@@ -138,7 +138,7 @@ void printPrimeNumbersLessThan(int a) {
 
 
 
-int main() {
+void main(void) {
     int a;
 //    output(abs(5));
 //    output(isMultiplier(0, -8));

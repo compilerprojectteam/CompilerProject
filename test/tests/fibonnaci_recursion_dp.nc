@@ -20,7 +20,7 @@ int f(int a, int result[]) {
     }
 }
 
-void main() {
+void main(void) {
     int i;
     i = 0;
     while (i < 50) {
