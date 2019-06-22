@@ -382,6 +382,9 @@ class SemanticActions:
         exp, exp_type = self.poop()
         addr, addr_type = self.poop()
 
+        if "array" not in addr_type:
+            return 'Cannot subscript variable of type int.'
+
         exp_type_error = self.check_bad_exp_type(exp_type)
         if exp_type_error:
             return exp_type_error
