@@ -89,6 +89,10 @@ class SemanticActions:
         return s, f
 
     def add_code(self, code):
+        if "#0" in code and "ADD" in code:
+            return
+
+
         self.i += 1
         self.code_block.append(code)
 
@@ -205,7 +209,7 @@ class SemanticActions:
             "@" if "indirect" in exp_type else "",
             exp,
             t))
-        self.add_code("(MULT, #-1, {}, {})".format(t, t))
+        self.add_code("(SUB, #0, {}, {})".format(t, t))
         self.push(t, "direct temp")
 
     def save_func(self, ct):
@@ -686,7 +690,6 @@ class SemanticActions:
         t_case = self.switch_stack[-2]
 
         self.code_block[i] = "(JPF, {}, {})".format(t_case, self.i)
-
 
     def backpatch_switch_outer(self, ct):
         exp, exp_type = self.poop()
@@ -1334,6 +1337,7 @@ if __name__ == "__main__":
         for line in p.sa.code_block:
             f.write("{}\t{}\n".format(i, line))
             print("{}\t{}".format(i, line))
+
             i += 1
         f.close()
 
