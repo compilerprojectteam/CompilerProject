@@ -92,11 +92,11 @@ Factor -> #save_to_temp num
 Factor -> #pid id Var-call-prime
 
 Var-call-prime -> Var-prime
-Var-call-prime -> #push_arg_counter #push_temp_vars ( Args #inc_stack_pointer #push_func_stuff #pop_arg_counter #dec_stack_pointer) #poop_temp_vars
+Var-call-prime -> #check_is_func #push_arg_counter #push_temp_vars ( Args #inc_stack_pointer #push_func_stuff #pop_arg_counter #dec_stack_pointer) #poop_temp_vars
 Var-prime -> [ Expression #add_to_var ]
 Var-prime -> ε
 
-Factor-prime -> #push_arg_counter #push_temp_vars ( Args #inc_stack_pointer #push_func_stuff #pop_arg_counter #dec_stack_pointer) # poop_temp_vars
+Factor-prime -> #check_is_func #push_arg_counter #push_temp_vars ( Args #inc_stack_pointer #push_func_stuff #pop_arg_counter #dec_stack_pointer) # poop_temp_vars
 Factor-prime -> ε
 
 

@@ -9,10 +9,6 @@ parser_errors = None
 scanner_output = None
 
 
-def error(message):
-    parser_errors.write(message + "\n")
-
-
 class TransitionDFA:
     def __init__(self, transitions):
         self.transitions = transitions
@@ -24,18 +20,20 @@ class SemanticActions:
          symbol_table (SymbolTable)
     """
 
-    def __init__(self, symbol_table):
+    def __init__(self, symbol_table, parser):
         self.st = symbol_table
         self.i = 0
         self.stack = []
         self.stack_flags = []
         self.code_block = []
+        self.real_line_numbers = []
         self.arg_counter = []
         self.func_args_stack = []
         self.while_stack = []
         self.while_stack_flags = []
         self.switch_stack = []
         self.switch_stack_flags = []
+        self.parser = parser
 
     def get_temps_in_use(self):
         temps_in_stack = [var for var, var_type in
@@ -92,9 +90,9 @@ class SemanticActions:
         if "#0" in code and "ADD" in code:
             return
 
-
         self.i += 1
         self.code_block.append(code)
+        self.real_line_numbers.append(self.parser.current_line_number)
 
     def pop_stack(self, ct):
         self.poop()
@@ -110,7 +108,7 @@ class SemanticActions:
 
         exp_type_error = self.check_bad_exp_type(exp_type)
         if exp_type_error:
-            return exp_type_error
+            return exp_type_error, self.real_line_numbers[self.stack[-2]]
 
         backpatch = self.stack[-2]
         self.code_block[backpatch] = "(JPF, {}{}, {})".format(
@@ -132,11 +130,11 @@ class SemanticActions:
 
         exp_type_error = self.check_bad_exp_type(exp1_type)
         if exp_type_error:
-            return exp_type_error
+            return exp_type_error, 0
 
         exp_type_error = self.check_bad_exp_type(exp2_type)
         if exp_type_error:
-            return exp_type_error
+            return exp_type_error, 0
 
         self.add_code("({}, {}{}, {}{}, {})".format(
             "ADD" if addop == "+" else "SUB",
@@ -156,11 +154,11 @@ class SemanticActions:
 
         exp_type_error = self.check_bad_exp_type(exp1_type)
         if exp_type_error:
-            return exp_type_error
+            return exp_type_error, 0
 
         exp_type_error = self.check_bad_exp_type(exp2_type)
         if exp_type_error:
-            return exp_type_error
+            return exp_type_error, 0
 
         self.add_code("({}, {}{}, {}{}, {})".format(
             "LT" if relop == "<" else "EQ",
@@ -182,11 +180,11 @@ class SemanticActions:
 
         exp_type_error = self.check_bad_exp_type(exp1_type)
         if exp_type_error:
-            return exp_type_error
+            return exp_type_error, 0
 
         exp_type_error = self.check_bad_exp_type(exp2_type)
         if exp_type_error:
-            return exp_type_error
+            return exp_type_error, 0
 
         self.add_code("(MULT, {}{}, {}{}, {})".format(
             "@" if "indirect" in exp1_type else "",
@@ -203,7 +201,7 @@ class SemanticActions:
 
         exp_type_error = self.check_bad_exp_type(exp_type)
         if exp_type_error:
-            return exp_type_error
+            return exp_type_error, 0
 
         self.add_code("(ASSIGN, {}{}, {})".format(
             "@" if "indirect" in exp_type else "",
@@ -251,6 +249,11 @@ class SemanticActions:
                                                   SymbolTable.STACK_BLOCK_SIZE,
                                                   SymbolTable.STACK_BASE, ))
 
+    def check_is_func(self, ct):
+        func = self.stack[-1]
+        if not func.is_function:
+            return "non-function symbol '{}' is not callable".format(func.name), 0
+
     def push_arg_counter(self, ct):
         self.func_args_stack.append([])
         self.arg_counter.append(-SymbolTable.STACK_BLOCK_SIZE)
@@ -285,7 +288,7 @@ class SemanticActions:
         function_address, _ = self.poop()
 
         if len(function_symbol.args) != len(self.func_args_stack[-1]):
-            return "Mismatch in numbers of arguments of '{}'.".format(function_symbol.name)
+            return "Mismatch in numbers of arguments of '{}'.".format(function_symbol.name), 0
 
         for j in range(len(function_symbol.args)):
             if function_symbol.args[j] != self.func_args_stack[-1][j]:
@@ -294,7 +297,7 @@ class SemanticActions:
                     function_symbol.name,
                     function_symbol.args[j],
                     self.func_args_stack[-1][j]
-                )
+                ), 0
 
         parent_func = function_symbol.parent_func
 
@@ -362,11 +365,11 @@ class SemanticActions:
 
         exp_type_error = self.check_bad_exp_type(rhs_type)
         if exp_type_error:
-            return exp_type_error
+            return exp_type_error, 0
 
         exp_type_error = self.check_bad_exp_type(lhs_type)
         if exp_type_error:
-            return exp_type_error
+            return exp_type_error, 0
 
         self.add_code("(ASSIGN, {}{}, {}{})".format("@" if "indirect" in rhs_type else "",
                                                     rhs,
@@ -387,11 +390,11 @@ class SemanticActions:
         addr, addr_type = self.poop()
 
         if "array" not in addr_type:
-            return 'Cannot subscript variable of type int.'
+            return "Cannot subscript variable of type int.", 0
 
         exp_type_error = self.check_bad_exp_type(exp_type)
         if exp_type_error:
-            return exp_type_error
+            return exp_type_error, 0
 
         if "indirect" in exp_type:
             self.add_code("(ASSIGN, @{}, {})".format(exp, t))
@@ -420,13 +423,13 @@ class SemanticActions:
         main_symbol = self.st.resolve_symbol("main")
 
         if not main_symbol:
-            return 'main function not found!'
+            return 'main function not found!', 0
 
         if main_symbol.type != "void" or main_symbol.args != []:
-            return "main function signature should be like 'void main(void)'"
+            return "main function signature should be like 'void main(void)'", 0
 
         if self.st.last_symbol[0].name != "main":
-            return 'last function is not main'
+            return 'last function is not main', 0
 
     def end(self, ct):
         self.add_code('(ADD, {}, {}, {})'.format(SymbolTable.STACK_BASE,
@@ -441,7 +444,7 @@ class SemanticActions:
         id_name = ct.value
         symbol = self.st.resolve_symbol(id_name)
         if not symbol:
-            return "'{}' is not defined".format(id_name)
+            return "'{}' is not defined".format(id_name), 0
 
         if symbol.is_function:
             self.push(symbol.address, "function")
@@ -508,7 +511,7 @@ class SemanticActions:
         j = self.st.get_last_function_scope()
         func_symbol = self.st.last_symbol[j - 1]
         if func_symbol.type == "int":
-            return "int type function '{}' must return something.".format(func_symbol.name)
+            return "int type function '{}' must return something.".format(func_symbol.name), 0
 
         return self.return_code(ct, True)
 
@@ -516,13 +519,15 @@ class SemanticActions:
         j = self.st.get_last_function_scope()
         func_symbol = self.st.last_symbol[j - 1]
         if func_symbol.type == "void":
-            return "void type function '{}' must not return any value.".format(func_symbol.name)
+            return "void type function '{}' must not return any value.".format(func_symbol.name), 0
 
         exp, exp_type = self.poop()
 
         exp_type_error = self.check_bad_exp_type(exp_type)
         if exp_type_error:
-            return exp_type_error
+            return exp_type_error, 0
+
+        func_symbol.does_return_value = True
 
         self.add_code("(ASSIGN, {}{}, {})".format("@" if "indirect" in exp_type else "",
                                                   exp,
@@ -533,8 +538,8 @@ class SemanticActions:
     def backpatch_func_skip(self, ct):
         func_symbol = self.st.last_symbol[-1]
 
-        # if func_symbol.type == "int":
-        #     return "int type function '{}' must return something.".format(func_symbol.name)
+        if func_symbol.type == "int" and not func_symbol.does_return_value:
+            return "int type function '{}' must return something.".format(func_symbol.name), 0
 
         if func_symbol.name != "main":
             semantic_error = self.return_code(ct, False)
@@ -549,7 +554,7 @@ class SemanticActions:
         self.st.stack_pointer[i] += 4
 
     def void_type_error(self, ct):
-        return "Illegal type of void for '{}'".format(ct.value)
+        return "Illegal type of void for '{}'".format(ct.value), 0
 
     def start_normal_scope(self, ct):
         self.st.start_new_scope("normal")
@@ -566,8 +571,11 @@ class SemanticActions:
     def create_symbol(self, ct):
         ttype, _ = self.poop()
 
+        if ct.value == "output":
+            return "'output' is reserved and can't be used as a symbol name", 0
+
         if ct.value in self.st.symbol_table[-1]:
-            return "'{}' already declared in this scope".format(ct.value)
+            return "'{}' already declared in this scope".format(ct.value), 0
 
         self.st.add_symbol(ct.value, ttype=ttype)
 
@@ -583,7 +591,7 @@ class SemanticActions:
         last_symbol = self.st.get_last_symbol()
 
         if last_symbol.type == "void":
-            return "Illegal type of void for '{}'".format(last_symbol.name)
+            return "Illegal type of void for '{}'".format(last_symbol.name), 0
 
         if self.st.get_current_memory_type() == "stack":
             i = self.st.get_last_function_scope()
@@ -601,6 +609,10 @@ class SemanticActions:
             self.st.heap_pointer += 4
 
     def inc_var_pointer_array(self, ct):
+
+        if int(ct.value) <= 0:
+            return "array length cannot be equal or smaller than zero", 0
+
         self.st.last_symbol[-1].is_array = True
         if self.st.get_current_memory_type() == "stack":
             i = self.st.get_last_function_scope()
@@ -631,7 +643,7 @@ class SemanticActions:
 
         exp_type_error = self.check_bad_exp_type(exp_type)
         if exp_type_error:
-            return exp_type_error
+            return exp_type_error, self.real_line_numbers[i]
 
         self.code_block[i] = "(JPF, {}{}, {})".format(
             "@" if "indirect" in exp_type else "",
@@ -648,7 +660,7 @@ class SemanticActions:
         # i = self.stack[-3]
 
         if len(self.while_stack) == 0:
-            return "No 'while' found for 'continue'"
+            return "No 'while' found for 'continue'", 0
 
         i = self.while_stack[-1]
         self.add_code("(JP, {})".format(i))
@@ -662,7 +674,7 @@ class SemanticActions:
             temp = self.switch_stack[-1]
             self.add_code("(JP, @{})".format(temp))
         else:
-            return "No 'while' or 'switch' found for 'break'."
+            return "No 'while' or 'switch' found for 'break'.", 0
 
     def compare_case(self, ct):
         t = self.get_temp()
@@ -671,7 +683,8 @@ class SemanticActions:
 
         exp_type_error = self.check_bad_exp_type(exp_type)
         if exp_type_error:
-            return exp_type_error
+            # TODO: fix the line number for this error
+            return exp_type_error, 0
 
         t_case = self.switch_stack[-2]
 
@@ -696,7 +709,7 @@ class SemanticActions:
 
         exp_type_error = self.check_bad_exp_type(exp_type)
         if exp_type_error:
-            return exp_type_error
+            return exp_type_error, 0
 
         i, _ = self.poop()
         temp, _ = self.poop(type='switch')
@@ -729,6 +742,7 @@ class Symbol:
         self.n_args = 0
         self.args = []
         self.parent_func = None
+        self.does_return_value = False
 
 
 class SymbolTable:
@@ -810,7 +824,7 @@ class Parser:
     def __init__(self, file_name):
         self.scanner = Scanner()
         self.st = SymbolTable()
-        self.sa = SemanticActions(self.st)
+        self.sa = SemanticActions(self.st, self)
         self.scanner_tokens = self.scanner.scan_file_ignore_extra(file_name)
         self.current_token = None
         self.current_line_number = None
@@ -1155,7 +1169,7 @@ class Parser:
 
             "Var-call-prime": TransitionDFA({
                 1: {("Var-prime", False): (-1, [], []),
-                    ("(", True): (2, [self.sa.push_arg_counter, self.sa.push_temp_vars], [])},
+                    ("(", True): (2, [self.sa.check_is_func, self.sa.push_arg_counter, self.sa.push_temp_vars], [])},
                 2: {("Args", False): (3, [], [])},
                 3: {(")", True): (-1, [self.sa.inc_stack_pointer, self.sa.push_func_stuff, self.sa.pop_arg_counter,
                                        self.sa.dec_stack_pointer], [self.sa.poop_temp_vars])},
@@ -1170,7 +1184,7 @@ class Parser:
 
             "Factor-prime": TransitionDFA({
                 1: {("Epsilon", True): (-1, [], []),
-                    ("(", True): (2, [self.sa.push_arg_counter, self.sa.push_temp_vars], [])},
+                    ("(", True): (2, [self.sa.check_is_func, self.sa.push_arg_counter, self.sa.push_temp_vars], [])},
                 2: {("Args", False): (3, [], [])},
                 3: {(")", True): (
                     -1, [self.sa.inc_stack_pointer, self.sa.push_func_stuff, self.sa.pop_arg_counter,
@@ -1205,6 +1219,10 @@ class Parser:
     def is_nullable(self, V):
         return "" in self.first[V]
 
+    def error(self, message):
+        self.is_code_generation_stopped = True
+        parser_errors.write(message + "\n")
+
     def get_next_token(self):
 
         while True:
@@ -1212,17 +1230,18 @@ class Parser:
             if self.current_token.type != Token.ERROR:
                 return
             else:
-                error("Lexical Error in line #{} : invalid token {}".format(self.current_line_number,
-                                                                            self.current_token.value))
+                self.error("Lexical Error in line #{} : invalid token {}".format(self.current_line_number,
+                                                                                 self.current_token.value))
 
     def perform_semantic_actions(self, funcs):
-        if not self.is_code_generation_stopped:
-            for func in funcs:
-                semantic_error = func(self.current_token)
-                if semantic_error is not None:
-                    self.is_code_generation_stopped = True
-                    error("#{} : Semantic Error! {}".format(self.current_line_number, semantic_error))
-                    break
+        if self.is_code_generation_stopped:
+            return
+        for func in funcs:
+            semantic_error = func(self.current_token)
+            if semantic_error is not None:
+                line_number = semantic_error[1] if semantic_error[1] > 0 else self.current_line_number
+                self.error("#{} : Semantic Error! {}".format(line_number, semantic_error[0]))
+                break
 
     def parse_from_non_terminal(self, V):
         # print("parsing from non terminal : ", V)
@@ -1267,10 +1286,10 @@ class Parser:
                     else:
                         if current_state != 1:
                             if var == Token.EOF:
-                                error("#{} : Syntax Error! Malformed Input".format(self.current_line_number))
+                                self.error("#{} : Syntax Error! Malformed Input".format(self.current_line_number))
                                 return False, me
                             else:
-                                error("#{} : Syntax Error! Missing {}".format(self.current_line_number, var))
+                                self.error("#{} : Syntax Error! Missing {}".format(self.current_line_number, var))
                                 current_state, _, _ = transitions[current_state][(var, True)]
                                 break
                 else:
@@ -1305,13 +1324,13 @@ class Parser:
                     if current_state != 1:
                         if c in self.follow[var] and not self.is_nullable(var):
                             current_state, _, _ = transitions[current_state][(var, False)]
-                            error("#{} : Syntax Error! Missing {}".format(self.current_line_number, var))
+                            self.error("#{} : Syntax Error! Missing {}".format(self.current_line_number, var))
                         if c not in self.follow[var] and c not in self.first[var]:
                             if c == Token.EOF:
-                                error("#{} : Syntax Error! Unexpected EndOfFile".format(self.current_line_number))
+                                self.error("#{} : Syntax Error! Unexpected EndOfFile".format(self.current_line_number))
                                 return False, me
                             else:
-                                error("#{} : Syntax Error! Unexpected {}".format(self.current_line_number, c))
+                                self.error("#{} : Syntax Error! Unexpected {}".format(self.current_line_number, c))
                                 self.get_next_token()
         return True, me
 
@@ -1334,9 +1353,9 @@ if __name__ == "__main__":
 
     with open("../out/output.txt", mode='w') as f:
         i = 0
-        for line in p.sa.code_block:
+        for real_line_number, line in zip(p.sa.real_line_numbers, p.sa.code_block):
             f.write("{}\t{}\n".format(i, line))
-            print("{}\t{}".format(i, line))
+            print("{}  ->  {}\t{}".format(real_line_number, i, line))
 
             i += 1
         f.close()

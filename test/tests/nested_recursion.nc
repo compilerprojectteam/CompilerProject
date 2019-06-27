@@ -1,5 +1,5 @@
 int f(int a) {
-    int g(int b) {
+    void g(int b) {
         output(b);
         f(b - 1);
     }
