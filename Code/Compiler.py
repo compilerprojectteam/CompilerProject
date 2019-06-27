@@ -724,7 +724,7 @@ class SymbolTable:
     STACK_BASE = 1500
     RETURN_VALUE_ADDRESS = 1504
     END_OF_PROGRAM_LINE = 1508
-    STACK_BLOCK_SIZE = 200
+    STACK_BLOCK_SIZE = 2000
 
     def __init__(self):
         self.symbol_table = []
