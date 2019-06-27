@@ -89,6 +89,10 @@ class SemanticActions:
         return s, f
 
     def add_code(self, code):
+        if "#0" in code and "ADD" in code:
+            return
+
+
         self.i += 1
         self.code_block.append(code)
 
@@ -205,7 +209,7 @@ class SemanticActions:
             "@" if "indirect" in exp_type else "",
             exp,
             t))
-        self.add_code("(MULT, #-1, {}, {})".format(t, t))
+        self.add_code("(SUB, #0, {}, {})".format(t, t))
         self.push(t, "direct temp")
 
     def save_func(self, ct):
@@ -322,7 +326,7 @@ class SemanticActions:
                     else:
                         self.add_code("(ASSIGN, @{}, {})".format(current_temp, current_temp))
                         parent_q_offset = -SymbolTable.STACK_BLOCK_SIZE + 4 * (
-                            current_func.parent_func.n_args + SymbolTable.N_STACK_VARS)
+                                current_func.parent_func.n_args + SymbolTable.N_STACK_VARS)
                         self.add_code("(ADD, {}, #{}, {})".format(current_temp, parent_q_offset, current_temp))
 
                 self.add_code("(ASSIGN, {}, {})".format(SymbolTable.STACK_BASE, t))
@@ -611,6 +615,9 @@ class SemanticActions:
             t = self.get_temp()
             self.push(t, "while end temp", type='while')
         elif scope_type == 'switch':
+            t = self.get_temp()
+            self.push(t, "switch condition temp", type='switch')
+            self.add_code("(ASSIGN, #{}, {})".format(0, t))
             self.save(ct)
             t = self.get_temp()
             self.push(t, "switch end temp", type='switch')
@@ -666,18 +673,23 @@ class SemanticActions:
         if exp_type_error:
             return exp_type_error
 
+        t_case = self.switch_stack[-2]
+
         self.add_code("(EQ, {}{}, {}, {})".format(
             "@" if "indirect" in exp_type else "",
             exp,
             num,
             t
         ))
-        self.push(t, "direct temp")
+        self.add_code("(ADD, {}, {}, {})".format(t, t_case, t_case))
+        # self.push(t_case, "direct temp")
 
     def backpatch_switch_inner(self, ct):
         i, _ = self.poop()
-        t, _ = self.poop()
-        self.code_block[i] = "(JPF, {}, {})".format(t, self.i + 1)
+        # t, _ = self.poop()
+        t_case = self.switch_stack[-2]
+
+        self.code_block[i] = "(JPF, {}, {})".format(t_case, self.i)
 
     def backpatch_switch_outer(self, ct):
         exp, exp_type = self.poop()
@@ -689,6 +701,7 @@ class SemanticActions:
         i, _ = self.poop()
         temp, _ = self.poop(type='switch')
         self.code_block[i] = "(ASSIGN, #{}, {})".format(self.i, temp)
+        case_temp, _ = self.poop(type='switch')
 
     @staticmethod
     def check_bad_exp_type(exp_type):
@@ -824,10 +837,10 @@ class Parser:
 
                 values = value.split()
                 values = [a.replace("ε", "")
-                           .replace("id", "ID")
-                           .replace("voID", "void")
-                           .replace("num", "NUM")
-                           .replace("eof", "EOF") for a in values]
+                              .replace("id", "ID")
+                              .replace("voID", "void")
+                              .replace("num", "NUM")
+                              .replace("eof", "EOF") for a in values]
 
                 dictionary[key] = values
 
@@ -1005,7 +1018,9 @@ class Parser:
                 2: {("NUM", True): (3, [self.sa.save_to_temp], [self.sa.compare_case])},
                 3: {(":", True): (4, [], [self.sa.save])},
                 4: {("Statement-list", False): (
-                    -1, [], [self.sa.backpatch_switch_inner, self.sa.jump_indirect_to_temp])},
+                    -1, [], [self.sa.backpatch_switch_inner,
+                             # self.sa.jump_indirect_to_temp
+                             ])},
             }),
 
             "Default-stmt": TransitionDFA({
@@ -1322,6 +1337,7 @@ if __name__ == "__main__":
         for line in p.sa.code_block:
             f.write("{}\t{}\n".format(i, line))
             print("{}\t{}".format(i, line))
+
             i += 1
         f.close()
 
