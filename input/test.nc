@@ -156,7 +156,7 @@ void main(void)
 
     i = 0;
     while(i < arrsize){
-        arr[i] = 300 - 3 * i;
+        arr[i] = (i - 10) * (i - 25) * (i - 50) * (i - 75);
         i = i + 1;
     }
 

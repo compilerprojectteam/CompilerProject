@@ -1,3 +1,12 @@
+int farid(int a[]){
+
+    switch(a[1]){
+        case 2: return 5; break;
+        case 3: return 6; break;
+    }
+
+}
+
 int abs(int a) {
     if (a < 0) {
         return -a;
@@ -147,7 +156,7 @@ void main(void)
 
     i = 0;
     while(i < arrsize){
-        arr[i] = 300 - 3 * i;
+        arr[i] = (i - 10) * (i - 25) * (i - 50) * (i - 75);
         i = i + 1;
     }
 
