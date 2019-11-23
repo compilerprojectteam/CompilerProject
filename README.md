@@ -113,7 +113,7 @@ Arg-list-prime -> , Expression Arg-list-prime
 Arg-list-prime -> ε
 ```
 
-## Example Program:
+## Example Program
 
 ```C
 void main(void) {
@@ -514,6 +514,3 @@ PRINT    3
 PRINT    4
 PRINT    13234123
 ```
-
-
-
