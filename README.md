@@ -1,7 +1,7 @@
 # CompilerProject
 Compiler Design course project 
 
-the grammer of language our compiler supports is: 
+the grammer of the language our compiler supports is: 
 
 ```
 Program -> Declaration-list eof
