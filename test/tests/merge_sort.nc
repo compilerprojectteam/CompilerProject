@@ -1,11 +1,3 @@
-int farid(int a[]){
-
-    switch(a[1]){
-        case 2: return 5; break;
-        case 3: return 6; break;
-    }
-
-}
 
 int abs(int a) {
     if (a < 0) {

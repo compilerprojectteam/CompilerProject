@@ -44,7 +44,7 @@ void main(void) {
 
     output(222222222);
 
-        switch (1 + 8) {
+    switch (1 + 8) {
         case 2: output(4);
         case 9: output(9);
         case 7: {

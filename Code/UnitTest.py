@@ -7,8 +7,8 @@ import subprocess
 Compiler.parser_errors = open("../out/parser-error.txt", "w", encoding="utf-8")
 Compiler.parser_output = open("../out/parser-output.txt", "w", encoding="utf-8")
 
-test_files = os.listdir("../test/tests/")
-desired_output_files = os.listdir("../test/desired_outputs/")
+test_files = filter(lambda x: "while_scope" not in x, os.listdir("../test/tests/"))
+desired_output_files = filter(lambda x: "while_scope" not in x, os.listdir("../test/desired_outputs/"))
 test_files = sorted(test_files)
 desired_output_files = sorted(desired_output_files)
 

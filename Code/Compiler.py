@@ -966,6 +966,7 @@ class Parser:
                     ("Compound-stmt", False): (-1, [self.sa.start_normal_scope], []),
                     ("Selection-stmt", False): (-1, [], []),
                     ("Iteration-stmt", False): (-1, [self.sa.start_iteration_scope], []),
+                    # ("Iteration-stmt", False): (-1, [], []),
                     ("Return-stmt", False): (-1, [], []),
                     ("Switch-stmt", False): (-1, [self.sa.start_switch_scope], [])}
             }),
@@ -995,6 +996,7 @@ class Parser:
                 2: {("(", True): (3, [], [])},
                 3: {("Expression", False): (4, [], [])},
                 4: {(")", True): (5, [], [self.sa.save])},
+                # 4: {(")", True): (5, [], [self.sa.save, self.sa.start_iteration_scope])},
                 5: {("Statement", False): (-1, [], [self.sa.backpatch_while_condition, self.sa.close_scope])},
             }),
 
